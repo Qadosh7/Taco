@@ -1,6 +1,6 @@
 
 import { Card, Suit, Player } from '../types';
-import { CARD_VALUES } from '../constants.tsx';
+import { CARD_VALUES } from '../constants';
 
 export const createDeck = (): Card[] => {
   const deck: Card[] = [];
@@ -33,7 +33,7 @@ export const distributeCards = (players: Player[], deck: Card[]): Player[] => {
   const playerCount = players.length;
   if (playerCount === 0) return players;
 
-  const newPlayers = players.map(p => ({ ...p, hand: [] }));
+  const newPlayers: Player[] = players.map(p => ({ ...p, hand: [] }));
   const shuffled = shuffleDeck(deck);
 
   shuffled.forEach((card, index) => {

@@ -1,22 +1,23 @@
 
 import React from 'react';
 import { Card } from '../types';
-import { COLORS } from '../constants.tsx';
+import { COLORS } from '../constants';
 
 interface CardUIProps {
   card?: Card;
   faceDown?: boolean;
   onClick?: () => void;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-const CardUI: React.FC<CardUIProps> = ({ card, faceDown, onClick, className = '' }) => {
+const CardUI: React.FC<CardUIProps> = ({ card, faceDown, onClick, className = '', style }) => {
   if (faceDown) {
     return (
       <div
         onClick={onClick}
         className={`w-24 h-36 rounded-xl border-4 border-white shadow-lg flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${className}`}
-        style={{ backgroundColor: COLORS.NAVY }}
+        style={{ ...style, backgroundColor: COLORS.NAVY }}
       >
         <div className="w-16 h-24 border-2 border-white/20 rounded-lg flex items-center justify-center">
           <span className="text-white/30 text-4xl font-bold">T</span>
@@ -30,6 +31,7 @@ const CardUI: React.FC<CardUIProps> = ({ card, faceDown, onClick, className = ''
   return (
     <div
       onClick={onClick}
+      style={style}
       className={`w-24 h-36 rounded-xl bg-white border border-gray-200 shadow-md flex flex-col p-2 relative select-none ${className}`}
     >
       <div className={`text-lg font-bold ${card.color === 'red' ? 'text-red-600' : 'text-black'}`}>

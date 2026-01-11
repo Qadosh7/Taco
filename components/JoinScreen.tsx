@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { COLORS } from '../constants.tsx';
+import { COLORS } from '../constants';
 
 interface JoinScreenProps {
   initialCode?: string;

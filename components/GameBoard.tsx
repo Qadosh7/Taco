@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GameState, GamePhase } from '../types';
-import { COLORS } from '../constants.tsx';
+import { COLORS } from '../constants';
 import CardUI from './CardUI';
 import { HapticService } from '../services/hapticService';
 import { AudioService } from '../services/audioService';
@@ -123,7 +123,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
                           className="shadow-2xl transition-all duration-300"
                           style={{
                               transform: `rotate(${idx * 8 - 15}deg) translate(${idx * 3}px, ${idx * 2}px)`,
-                          } as any}
+                          }}
                       />
                     </div>
                 ))

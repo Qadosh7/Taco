@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { GameState } from '../types';
-import { COLORS } from '../constants.tsx';
+import { COLORS } from '../constants';
 
 interface LobbyProps {
   gameState: GameState;
