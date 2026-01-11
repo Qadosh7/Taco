@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { GameState, GamePhase } from '../types';
 import { COLORS } from '../constants.tsx';
 import CardUI from './CardUI';
+import { HapticService } from '../services/hapticService';
+import { AudioService } from '../services/audioService';
 
 interface GameBoardProps {
   gameState: GameState;
@@ -15,26 +17,25 @@ interface GameBoardProps {
 const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay, onResolve, onQuit }) => {
   const [showLoserModal, setShowLoserModal] = useState(false);
   const currentPlayer = gameState.players[gameState.currentTurnIndex];
-  const me = gameState.players.find(p => p.id === currentUserId)!;
+  const me = gameState.players.find(p => p.id === currentUserId);
   const isMyTurn = currentPlayer?.id === currentUserId;
-  const isHost = me.isHost;
+  const isHost = me?.isHost;
 
-  // Haptic Feedback for turn changes
   useEffect(() => {
-    if (isMyTurn && "vibrate" in navigator) {
-      navigator.vibrate([100, 50, 100]); // Pulse twice when it's your turn
+    if (isMyTurn) {
+      HapticService.vibrateTurn();
     }
   }, [isMyTurn]);
 
+  if (!me) return <div className="p-8 text-center font-bold">Reconectando...</div>;
+
   const handlePlayAction = () => {
     if (isMyTurn) {
-      if ("vibrate" in navigator) navigator.vibrate(50);
       onPlay();
     }
   };
 
   const handleResolveAction = (loserId: string) => {
-    if ("vibrate" in navigator) navigator.vibrate(200);
     onResolve(loserId);
     setShowLoserModal(false);
   };
@@ -56,14 +57,24 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
         .animate-glow {
           animation: border-glow 2s infinite ease-in-out;
         }
+        @keyframes float-card {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+        .animate-float {
+          animation: float-card 3s infinite ease-in-out;
+        }
       `}</style>
 
       {/* Header */}
       <header className="p-4 flex justify-between items-center bg-[#0D3B66] text-white shadow-md z-10">
         <button onClick={onQuit} className="text-white/70 text-sm font-bold active:opacity-50">SAIR</button>
         <div className="flex flex-col items-center">
-          <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Em Jogo</span>
-          <span className="font-bold">Sala: {gameState.roomCode}</span>
+          <div className="flex items-center gap-1">
+             <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+             <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Sincronizado</span>
+          </div>
+          <span className="font-bold text-xs">Sala: {gameState.roomCode}</span>
         </div>
         <div className="text-xs font-black text-[#F4D35E] bg-white/10 px-3 py-1 rounded-full">
           Mesa: {gameState.tablePile.length}
@@ -95,20 +106,26 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
 
         {/* Center Pile */}
         <div className="relative w-48 h-64 flex items-center justify-center">
-            {/* Table background decoration */}
             <div className={`absolute w-72 h-72 rounded-full border-4 border-[#0D3B66]/5 bg-[#0D3B66]/2 transition-all duration-700 ${isMyTurn ? 'scale-110 opacity-20' : 'scale-100 opacity-10'}`}></div>
 
             {gameState.tablePile.length > 0 ? (
                 gameState.tablePile.slice(-5).map((card, idx) => (
-                    <CardUI
-                        key={card.id}
-                        card={card}
-                        className="absolute shadow-2xl transition-all duration-300"
-                        style={{
-                            transform: `rotate(${idx * 8 - 15}deg) translate(${idx * 3}px, ${idx * 2}px)`,
-                            zIndex: idx
-                        } as any}
-                    />
+                    <div 
+                      key={card.id} 
+                      className="absolute animate-float"
+                      style={{ 
+                        animationDelay: `${idx * 0.4}s`,
+                        zIndex: idx 
+                      }}
+                    >
+                      <CardUI
+                          card={card}
+                          className="shadow-2xl transition-all duration-300"
+                          style={{
+                              transform: `rotate(${idx * 8 - 15}deg) translate(${idx * 3}px, ${idx * 2}px)`,
+                          } as any}
+                      />
+                    </div>
                 ))
             ) : (
                 <div className="border-4 border-dashed border-[#0D3B66]/10 rounded-3xl w-28 h-40 flex flex-col items-center justify-center text-[#0D3B66]/20 italic text-[10px] gap-2">
@@ -121,7 +138,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
         {/* Players Summary List */}
         <div className="w-full mt-12 overflow-x-auto py-2 flex gap-4 no-scrollbar px-4">
             {gameState.players.map(p => (
-                <div key={p.id} className={`flex-shrink-0 flex flex-col items-center transition-all duration-500 ${p.id === currentPlayer.id ? 'opacity-100 scale-110' : 'opacity-40 scale-90 grayscale-[0.5]'}`}>
+                <div key={p.id} className={`flex-shrink-0 flex flex-col items-center transition-all duration-500 ${p.id === currentPlayer?.id ? 'opacity-100 scale-110' : 'opacity-40 scale-90 grayscale-[0.5]'}`}>
                     <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center font-black text-xl mb-1 shadow-sm ${p.id === currentUserId ? 'bg-[#F4D35E] border-[#0D3B66] text-[#0D3B66]' : 'bg-[#0D3B66] border-white text-white'}`}>
                         {p.name.charAt(0)}
                     </div>
@@ -140,7 +157,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
         ? 'bg-white shadow-[0_-15px_40px_rgba(249,87,56,0.15)] border-white/50' 
         : 'bg-gray-100/80 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] border-transparent'
       } flex flex-col items-center z-10`}>
-        <div className={`relative mb-6 transform transition-all duration-500 ${isMyTurn ? 'scale-105' : 'scale-90 opacity-60 grayscale-[0.3]'}`}>
+        <div className={`relative mb-6 transform transition-all duration-500 ${isMyTurn ? 'scale-105' : 'scale-90 opacity-60 grayscale-[0.3]'} ${isMyTurn ? 'animate-float' : ''}`}>
             <CardUI
                 faceDown={!isMyTurn}
                 card={me.hand[me.hand.length - 1]}
@@ -163,11 +180,11 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
             )}
         </div>
 
-        {/* Admin Controls - Floating button style */}
+        {/* Admin Controls */}
         {isHost && gameState.tablePile.length > 0 && (
           <button
             onClick={() => {
-                if ("vibrate" in navigator) navigator.vibrate(10);
+                HapticService.vibrateAction();
                 setShowLoserModal(true);
             }}
             className="w-full bg-[#0D3B66] text-white py-5 rounded-2xl font-black tracking-[0.2em] shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all mt-4 hover:bg-[#154c7d]"
@@ -182,7 +199,6 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6 animate-in fade-in duration-200">
           <div className="bg-[#FAF0CA] w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border-4 border-[#0D3B66]">
             <h3 className="text-2xl font-black text-[#0D3B66] text-center mb-2 uppercase italic">DEFINIR PERDEDOR</h3>
-            <p className="text-center text-[#0D3B66]/60 mb-8 text-xs font-bold uppercase tracking-widest">A rodada será encerrada agora.</p>
             <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
               {gameState.players.map(p => (
                 <button
@@ -196,7 +212,6 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
                     </div>
                     <span>{p.name}</span>
                   </div>
-                  <i className="fa-solid fa-hand-pointer opacity-0 group-active:opacity-100 text-[#0D3B66]"></i>
                 </button>
               ))}
             </div>
@@ -210,24 +225,18 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
         </div>
       )}
 
-      {/* Game Over Screen */}
+      {/* Game Over */}
       {gameState.phase === GamePhase.GAME_OVER && (
           <div className="fixed inset-0 bg-[#0D3B66] z-[60] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
-              <div className="relative mb-8">
-                <div className="text-9xl animate-bounce">💩</div>
-                <div className="absolute -top-4 -right-4 bg-white text-[#0D3B66] p-2 rounded-full font-black text-xs rotate-12 shadow-xl">PERDEU TUDO!</div>
-              </div>
               <h1 className="text-5xl font-black text-[#F4D35E] mb-4 uppercase italic leading-none">TACO<br/>LEVEL MAX!</h1>
               <div className="bg-white/10 p-6 rounded-3xl backdrop-blur-sm border border-white/20 mb-12 w-full max-w-xs">
-                  <p className="text-white/60 text-xs font-bold uppercase tracking-widest mb-2">O Grande Perdedor:</p>
                   <p className="text-white text-3xl font-black uppercase tracking-tighter">
-                      {gameState.players.find(p => p.id === gameState.winnerId)?.name}
+                      {gameState.players.find(p => p.id === gameState.winnerId)?.name} Perdeu!
                   </p>
               </div>
-
               <button
                   onClick={onQuit}
-                  className="w-full max-w-xs p-6 bg-[#F95738] text-white rounded-[2rem] font-black text-xl shadow-2xl active:scale-95 transition-all border-b-8 border-black/20"
+                  className="w-full max-w-xs p-6 bg-[#F95738] text-white rounded-[2rem] font-black text-xl shadow-2xl transition-all"
               >
                   NOVA PARTIDA
               </button>
