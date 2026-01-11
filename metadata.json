@@ -1,0 +1,5 @@
+{
+  "name": "Taco Online",
+  "description": "Uma versão digital mobile-first do clássico jogo de cartas Taco, com controle administrativo de rodadas e distribuição automática de cartas.",
+  "requestFramePermissions": []
+}
