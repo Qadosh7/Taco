@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameState, GamePhase } from '../types';
 import { COLORS } from '../constants.tsx';
 import CardUI from './CardUI';
@@ -19,126 +19,192 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
   const isMyTurn = currentPlayer?.id === currentUserId;
   const isHost = me.isHost;
 
-  const topCard = gameState.tablePile.length > 0 ? gameState.tablePile[gameState.tablePile.length - 1] : null;
+  // Haptic Feedback for turn changes
+  useEffect(() => {
+    if (isMyTurn && "vibrate" in navigator) {
+      navigator.vibrate([100, 50, 100]); // Pulse twice when it's your turn
+    }
+  }, [isMyTurn]);
+
+  const handlePlayAction = () => {
+    if (isMyTurn) {
+      if ("vibrate" in navigator) navigator.vibrate(50);
+      onPlay();
+    }
+  };
+
+  const handleResolveAction = (loserId: string) => {
+    if ("vibrate" in navigator) navigator.vibrate(200);
+    onResolve(loserId);
+    setShowLoserModal(false);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF0CA] overflow-hidden">
+      <style>{`
+        @keyframes pulse-subtle {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.9; }
+        }
+        .animate-pulse-subtle {
+          animation: pulse-subtle 2s infinite ease-in-out;
+        }
+        @keyframes border-glow {
+          0%, 100% { box-shadow: 0 0 5px rgba(249, 87, 56, 0.4); }
+          50% { box-shadow: 0 0 20px rgba(249, 87, 56, 0.8); }
+        }
+        .animate-glow {
+          animation: border-glow 2s infinite ease-in-out;
+        }
+      `}</style>
+
       {/* Header */}
-      <header className="p-4 flex justify-between items-center bg-[#0D3B66] text-white shadow-md">
-        <button onClick={onQuit} className="text-white/70 text-sm font-bold">SAIR</button>
+      <header className="p-4 flex justify-between items-center bg-[#0D3B66] text-white shadow-md z-10">
+        <button onClick={onQuit} className="text-white/70 text-sm font-bold active:opacity-50">SAIR</button>
         <div className="flex flex-col items-center">
           <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Em Jogo</span>
           <span className="font-bold">Sala: {gameState.roomCode}</span>
         </div>
-        <div className="text-xs font-black text-[#F4D35E]">
-          Pilha: {gameState.tablePile.length}
+        <div className="text-xs font-black text-[#F4D35E] bg-white/10 px-3 py-1 rounded-full">
+          Mesa: {gameState.tablePile.length}
         </div>
       </header>
 
       {/* Main Table Area */}
       <main className="flex-1 relative flex flex-col items-center justify-center p-4">
         {/* Turn Indicator */}
-        <div className="absolute top-4 left-0 right-0 flex justify-center px-4">
-            <div className={`px-6 py-2 rounded-full border-2 shadow-sm transition-colors ${isMyTurn ? 'bg-[#F95738] border-white text-white' : 'bg-white border-[#0D3B66] text-[#0D3B66]'}`}>
-                <span className="font-black text-sm uppercase">
-                    {isMyTurn ? 'Sua Vez!' : `Vez de: ${currentPlayer?.name}`}
-                </span>
+        <div className="absolute top-4 left-0 right-0 flex justify-center px-4 z-10">
+            <div className={`px-6 py-2 rounded-full border-2 shadow-lg transition-all duration-500 transform ${
+                isMyTurn 
+                ? 'bg-[#F95738] border-white text-white scale-110 animate-pulse-subtle' 
+                : 'bg-white border-[#0D3B66] text-[#0D3B66] scale-100'
+            }`}>
+                <div className="flex items-center gap-2">
+                    {isMyTurn && (
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                      </span>
+                    )}
+                    <span className="font-black text-sm uppercase tracking-tight">
+                        {isMyTurn ? 'Sua Vez de Jogar!' : `Vez de: ${currentPlayer?.name}`}
+                    </span>
+                </div>
             </div>
         </div>
 
         {/* Center Pile */}
         <div className="relative w-48 h-64 flex items-center justify-center">
             {/* Table background decoration */}
-            <div className="absolute w-64 h-64 rounded-full border-4 border-[#0D3B66]/5 bg-[#0D3B66]/2"></div>
+            <div className={`absolute w-72 h-72 rounded-full border-4 border-[#0D3B66]/5 bg-[#0D3B66]/2 transition-all duration-700 ${isMyTurn ? 'scale-110 opacity-20' : 'scale-100 opacity-10'}`}></div>
 
             {gameState.tablePile.length > 0 ? (
-                gameState.tablePile.slice(-3).map((card, idx) => (
+                gameState.tablePile.slice(-5).map((card, idx) => (
                     <CardUI
                         key={card.id}
                         card={card}
-                        className="absolute shadow-2xl"
+                        className="absolute shadow-2xl transition-all duration-300"
                         style={{
-                            transform: `rotate(${idx * 5 - 5}deg) translate(${idx * 2}px, ${idx * 2}px)`,
+                            transform: `rotate(${idx * 8 - 15}deg) translate(${idx * 3}px, ${idx * 2}px)`,
                             zIndex: idx
                         } as any}
                     />
                 ))
             ) : (
-                <div className="border-2 border-dashed border-[#0D3B66]/20 rounded-xl w-24 h-36 flex items-center justify-center text-[#0D3B66]/10 italic text-xs">
+                <div className="border-4 border-dashed border-[#0D3B66]/10 rounded-3xl w-28 h-40 flex flex-col items-center justify-center text-[#0D3B66]/20 italic text-[10px] gap-2">
+                    <i className="fa-solid fa-layer-group text-2xl"></i>
                     Pilha Vazia
                 </div>
             )}
         </div>
 
         {/* Players Summary List */}
-        <div className="w-full mt-8 overflow-x-auto py-2 flex gap-4 no-scrollbar">
+        <div className="w-full mt-12 overflow-x-auto py-2 flex gap-4 no-scrollbar px-4">
             {gameState.players.map(p => (
-                <div key={p.id} className={`flex-shrink-0 flex flex-col items-center ${p.id === currentPlayer.id ? 'opacity-100 scale-110' : 'opacity-40'} transition-all`}>
-                    <div className={`w-12 h-12 rounded-full border-2 flex items-center justify-center font-bold mb-1 ${p.id === currentUserId ? 'bg-[#F4D35E] border-[#0D3B66] text-[#0D3B66]' : 'bg-[#0D3B66] border-white text-white'}`}>
+                <div key={p.id} className={`flex-shrink-0 flex flex-col items-center transition-all duration-500 ${p.id === currentPlayer.id ? 'opacity-100 scale-110' : 'opacity-40 scale-90 grayscale-[0.5]'}`}>
+                    <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center font-black text-xl mb-1 shadow-sm ${p.id === currentUserId ? 'bg-[#F4D35E] border-[#0D3B66] text-[#0D3B66]' : 'bg-[#0D3B66] border-white text-white'}`}>
                         {p.name.charAt(0)}
                     </div>
-                    <span className="text-[10px] font-bold text-[#0D3B66] truncate w-16 text-center">{p.name}</span>
-                    <span className="text-[10px] text-[#EE964B] font-black">{p.hand.length} 🎴</span>
+                    <span className="text-[10px] font-black text-[#0D3B66] truncate w-16 text-center uppercase tracking-tighter">{p.name}</span>
+                    <div className="bg-[#EE964B] text-white text-[9px] px-2 rounded-full font-black mt-1">
+                        {p.hand.length}
+                    </div>
                 </div>
             ))}
         </div>
       </main>
 
       {/* Footer / Player Controls */}
-      <footer className="p-8 bg-white/50 backdrop-blur-md rounded-t-3xl shadow-[0_-10px_20px_rgba(0,0,0,0.05)] border-t border-white flex flex-col items-center">
-        <div className="relative mb-6">
+      <footer className={`p-8 rounded-t-[3rem] transition-all duration-500 border-t ${
+        isMyTurn 
+        ? 'bg-white shadow-[0_-15px_40px_rgba(249,87,56,0.15)] border-white/50' 
+        : 'bg-gray-100/80 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] border-transparent'
+      } flex flex-col items-center z-10`}>
+        <div className={`relative mb-6 transform transition-all duration-500 ${isMyTurn ? 'scale-105' : 'scale-90 opacity-60 grayscale-[0.3]'}`}>
             <CardUI
                 faceDown={!isMyTurn}
                 card={me.hand[me.hand.length - 1]}
-                className={`${!isMyTurn ? 'opacity-50 grayscale' : 'animate-bounce shadow-xl'}`}
-                onClick={() => isMyTurn && onPlay()}
+                className={`transition-all duration-500 ${
+                  isMyTurn 
+                  ? 'animate-bounce shadow-2xl ring-4 ring-[#F4D35E] animate-glow' 
+                  : 'shadow-md pointer-events-none'
+                }`}
+                onClick={handlePlayAction}
             />
-            <div className="absolute -top-3 -right-3 bg-[#F95738] text-white w-8 h-8 rounded-full flex items-center justify-center font-black text-xs border-2 border-white shadow-lg">
+            <div className={`absolute -top-3 -right-3 w-10 h-10 rounded-full flex items-center justify-center font-black text-sm border-4 border-white shadow-xl transition-colors duration-500 ${
+              isMyTurn ? 'bg-[#F95738] text-white' : 'bg-gray-400 text-white'
+            }`}>
                 {me.hand.length}
             </div>
+            {isMyTurn && (
+              <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#0D3B66] text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-widest animate-pulse">
+                Sua Vez!
+              </div>
+            )}
         </div>
 
-        <p className="text-center text-[#0D3B66] font-semibold text-sm mb-4">
-            {isMyTurn ? "Toque na carta para jogar!" : "Aguarde sua vez..."}
-        </p>
-
-        {/* Admin Controls */}
+        {/* Admin Controls - Floating button style */}
         {isHost && gameState.tablePile.length > 0 && (
           <button
-            onClick={() => setShowLoserModal(true)}
-            className="w-full bg-[#0D3B66] text-white py-4 rounded-2xl font-black tracking-widest shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-transform"
+            onClick={() => {
+                if ("vibrate" in navigator) navigator.vibrate(10);
+                setShowLoserModal(true);
+            }}
+            className="w-full bg-[#0D3B66] text-white py-5 rounded-2xl font-black tracking-[0.2em] shadow-xl flex items-center justify-center gap-3 active:scale-95 transition-all mt-4 hover:bg-[#154c7d]"
           >
-            QUEM PERDEU? <i className="fa-solid fa-gavel"></i>
+            QUEM PERDEU? <i className="fa-solid fa-gavel text-xl text-[#F4D35E]"></i>
           </button>
         )}
       </footer>
 
       {/* Loser Selection Modal */}
       {showLoserModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-          <div className="bg-[#FAF0CA] w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-            <h3 className="text-xl font-black text-[#0D3B66] text-center mb-6 uppercase tracking-wider">Mão de Alguém!</h3>
-            <p className="text-center text-[#0D3B66]/70 mb-8 text-sm italic font-medium">Selecione quem não bateu ou errou a rodada:</p>
-            <div className="space-y-3">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="bg-[#FAF0CA] w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl border-4 border-[#0D3B66]">
+            <h3 className="text-2xl font-black text-[#0D3B66] text-center mb-2 uppercase italic">DEFINIR PERDEDOR</h3>
+            <p className="text-center text-[#0D3B66]/60 mb-8 text-xs font-bold uppercase tracking-widest">A rodada será encerrada agora.</p>
+            <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
               {gameState.players.map(p => (
                 <button
                   key={p.id}
-                  onClick={() => {
-                    onResolve(p.id);
-                    setShowLoserModal(false);
-                  }}
-                  className="w-full p-4 bg-white border-2 border-[#0D3B66] rounded-2xl font-bold text-[#0D3B66] flex justify-between items-center transition-all active:bg-[#F4D35E]"
+                  onClick={() => handleResolveAction(p.id)}
+                  className="w-full p-5 bg-white border-2 border-[#0D3B66]/10 rounded-2xl font-black text-[#0D3B66] flex justify-between items-center transition-all active:bg-[#F4D35E] active:border-[#0D3B66] group shadow-sm"
                 >
-                  {p.name}
-                  <span className="text-xs opacity-50 font-normal">({p.hand.length} cartas)</span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-[#0D3B66] text-white flex items-center justify-center text-xs">
+                        {p.name.charAt(0)}
+                    </div>
+                    <span>{p.name}</span>
+                  </div>
+                  <i className="fa-solid fa-hand-pointer opacity-0 group-active:opacity-100 text-[#0D3B66]"></i>
                 </button>
               ))}
             </div>
             <button
               onClick={() => setShowLoserModal(false)}
-              className="mt-6 w-full text-center text-[#F95738] font-black text-xs uppercase"
+              className="mt-8 w-full text-center text-[#F95738] font-black text-xs uppercase tracking-[0.3em]"
             >
-              Cancelar Decisão
+              [ Cancelar ]
             </button>
           </div>
         </div>
@@ -146,16 +212,22 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
 
       {/* Game Over Screen */}
       {gameState.phase === GamePhase.GAME_OVER && (
-          <div className="fixed inset-0 bg-[#0D3B66] z-[60] flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
-              <div className="text-8xl mb-6">💩</div>
-              <h1 className="text-4xl font-black text-[#F4D35E] mb-2 uppercase italic">PERDEDOR FINAL!</h1>
-              <p className="text-white text-xl font-bold mb-12">
-                  {gameState.players.find(p => p.id === gameState.winnerId)?.name} ficou com o baralho inteiro!
-              </p>
+          <div className="fixed inset-0 bg-[#0D3B66] z-[60] flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
+              <div className="relative mb-8">
+                <div className="text-9xl animate-bounce">💩</div>
+                <div className="absolute -top-4 -right-4 bg-white text-[#0D3B66] p-2 rounded-full font-black text-xs rotate-12 shadow-xl">PERDEU TUDO!</div>
+              </div>
+              <h1 className="text-5xl font-black text-[#F4D35E] mb-4 uppercase italic leading-none">TACO<br/>LEVEL MAX!</h1>
+              <div className="bg-white/10 p-6 rounded-3xl backdrop-blur-sm border border-white/20 mb-12 w-full max-w-xs">
+                  <p className="text-white/60 text-xs font-bold uppercase tracking-widest mb-2">O Grande Perdedor:</p>
+                  <p className="text-white text-3xl font-black uppercase tracking-tighter">
+                      {gameState.players.find(p => p.id === gameState.winnerId)?.name}
+                  </p>
+              </div>
 
               <button
                   onClick={onQuit}
-                  className="w-full max-w-xs p-5 bg-[#F95738] text-white rounded-2xl font-black text-xl shadow-2xl active:scale-95 transition-all"
+                  className="w-full max-w-xs p-6 bg-[#F95738] text-white rounded-[2rem] font-black text-xl shadow-2xl active:scale-95 transition-all border-b-8 border-black/20"
               >
                   NOVA PARTIDA
               </button>

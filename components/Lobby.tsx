@@ -19,20 +19,23 @@ const Lobby: React.FC<LobbyProps> = ({ gameState, currentUserId, onStart, onQuit
     const shareUrl = `${window.location.origin}${window.location.pathname}?room=${gameState.roomCode}`;
     const shareData = {
       title: 'Taco Online',
-      text: `Vem jogar Taco comigo! Código da sala: ${gameState.roomCode}`,
+      text: `Jogue Taco comigo! Sala: ${gameState.roomCode}`,
       url: shareUrl,
     };
 
-    if (navigator.share) {
-      try {
+    try {
+      if (navigator.share) {
         await navigator.share(shareData);
-      } catch (err) {
-        console.log('Error sharing:', err);
-        // Fallback if user cancels or share fails
-        copyToClipboard(shareUrl);
+      } else {
+        throw new Error('Share not supported');
       }
-    } else {
-      copyToClipboard(shareUrl);
+    } catch (err) {
+      // Fallback to clipboard for non-mobile or if sharing fails/is cancelled
+      if (err instanceof Error && err.name !== 'AbortError') {
+        copyToClipboard(shareUrl);
+      } else if (!(err instanceof Error)) {
+         copyToClipboard(shareUrl);
+      }
     }
   };
 
@@ -40,9 +43,10 @@ const Lobby: React.FC<LobbyProps> = ({ gameState, currentUserId, onStart, onQuit
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2500);
     } catch (err) {
-      alert('Não foi possível copiar o link.');
+      console.error('Falha ao copiar:', err);
+      alert('Não foi possível copiar o link automaticamente.');
     }
   };
 
@@ -62,118 +66,136 @@ const Lobby: React.FC<LobbyProps> = ({ gameState, currentUserId, onStart, onQuit
       <style>{`
         @keyframes pulse-orange {
           0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(238, 150, 75, 0.7); }
-          70% { transform: scale(1.02); box-shadow: 0 0 0 10px rgba(238, 150, 75, 0); }
+          70% { transform: scale(1.03); box-shadow: 0 0 0 12px rgba(238, 150, 75, 0); }
           100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(238, 150, 75, 0); }
         }
         .animate-pulse-custom {
-          animation: pulse-orange 2s infinite;
+          animation: pulse-orange 2.5s infinite;
         }
       `}</style>
 
-      <div className="flex justify-between items-center mb-8">
-        <button onClick={onQuit} className="text-[#0D3B66] flex items-center gap-1 font-bold active:opacity-60 transition-opacity">
-          <i className="fa-solid fa-chevron-left"></i> Sair
+      <div className="flex justify-between items-center mb-10">
+        <button 
+          onClick={onQuit} 
+          className="text-[#0D3B66] flex items-center gap-2 font-bold active:opacity-60 transition-opacity p-2 -ml-2"
+        >
+          <i className="fa-solid fa-arrow-left"></i> Sair
         </button>
+        
         <div 
           onClick={handleCopyCode}
-          className="relative bg-[#F4D35E] pl-4 pr-10 py-2 rounded-full font-black text-[#0D3B66] border-2 border-[#0D3B66] shadow-sm cursor-pointer active:scale-95 transition-transform"
+          className="relative group bg-white px-4 py-2 rounded-2xl font-black text-[#0D3B66] border-2 border-[#0D3B66] shadow-sm cursor-pointer active:scale-95 transition-all"
         >
-          #{gameState.roomCode}
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center bg-[#0D3B66] rounded-full text-white text-[10px]">
+          <span className="text-xs opacity-50 block text-[8px] uppercase tracking-tighter mb-[-4px]">Código</span>
+          <span className="text-lg">#{gameState.roomCode}</span>
+          <div className="absolute -right-2 -top-2 w-6 h-6 flex items-center justify-center bg-[#F4D35E] border-2 border-[#0D3B66] rounded-full text-[#0D3B66] text-[10px]">
             {codeCopied ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-copy"></i>}
           </div>
           {codeCopied && (
-            <span className="absolute -bottom-6 right-0 text-[10px] text-[#0D3B66] font-bold whitespace-nowrap">Código copiado!</span>
+            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] text-[#0D3B66] font-bold bg-[#F4D35E] px-2 py-0.5 rounded shadow-sm whitespace-nowrap animate-in fade-in slide-in-from-top-1">Copiado!</span>
           )}
         </div>
       </div>
 
-      <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-[#0D3B66]">Sala de Espera</h2>
-        <p className="text-sm text-[#0D3B66]/70 mt-1">Compartilhe o link para começar</p>
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-black text-[#0D3B66] leading-tight">Sua sala está<br/>pronta!</h2>
+        <p className="text-sm text-[#1A1A1A] opacity-70 mt-2 font-medium">Convide a galera para bater Taco</p>
       </div>
 
-      <button
-        onClick={handleShare}
-        className={`mb-10 w-full py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 transition-all shadow-xl ${
-          copied ? 'bg-green-500 text-white' : 'bg-[#EE964B] text-white active:scale-95'
-        } ${gameState.players.length < 2 && !copied ? 'animate-pulse-custom' : ''}`}
-      >
-        {copied ? (
-          <><i className="fa-solid fa-check-double text-xl"></i> LINK COPIADO!</>
-        ) : (
-          <><i className="fa-solid fa-share-nodes text-xl"></i> CONVIDAR AMIGOS</>
+      <div className="relative mb-12">
+        <button
+          onClick={handleShare}
+          className={`w-full py-6 rounded-[2rem] font-black text-xl flex flex-col items-center justify-center gap-1 transition-all shadow-2xl ${
+            copied ? 'bg-green-600 text-white' : 'bg-[#EE964B] text-white active:scale-95'
+          } ${gameState.players.length < 2 && !copied ? 'animate-pulse-custom' : ''}`}
+        >
+          <div className="flex items-center gap-3">
+            <i className={`fa-solid ${copied ? 'fa-check-circle' : 'fa-share-nodes'} text-2xl`}></i>
+            <span>{copied ? 'LINK NA MÃO!' : 'CONVIDAR GALERA'}</span>
+          </div>
+          {!copied && <span className="text-[10px] opacity-80 font-bold uppercase tracking-widest">Clique para compartilhar</span>}
+        </button>
+        
+        {copied && (
+          <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-[#0D3B66] text-white text-[10px] font-black px-4 py-1.5 rounded-full shadow-lg animate-bounce">
+            LINK COPIADO COM SUCESSO!
+          </div>
         )}
-      </button>
+      </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="flex-1 space-y-4 overflow-y-auto px-1">
         <div className="flex items-center justify-between mb-2">
-           <p className="text-[10px] font-black uppercase text-[#0D3B66]/40">Jogadores na Sala</p>
-           <span className="text-[10px] font-black bg-[#0D3B66]/10 text-[#0D3B66] px-2 py-0.5 rounded-full">{gameState.players.length} / 10</span>
+           <h3 className="text-xs font-black uppercase tracking-widest text-[#0D3B66]/60">Participantes</h3>
+           <span className="text-[10px] font-black bg-[#0D3B66] text-white px-2.5 py-1 rounded-full">{gameState.players.length} online</span>
         </div>
         
-        {gameState.players.map((player, index) => (
-          <div
-            key={player.id}
-            style={{ animationDelay: `${index * 100}ms` }}
-            className="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border-l-8 border-[#F95738] animate-in slide-in-from-left duration-300 fill-mode-both"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#0D3B66] flex items-center justify-center text-white font-bold shadow-inner">
-                {player.name.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <span className="font-bold text-[#0D3B66]">{player.name}</span>
-                {player.isHost && (
-                  <span className="ml-2 text-[9px] bg-[#F4D35E] text-[#0D3B66] px-1.5 py-0.5 rounded-sm uppercase font-black">
-                    Dono
-                  </span>
-                )}
-              </div>
-            </div>
-            {player.id === currentUserId && (
-              <span className="text-[9px] bg-[#0D3B66] text-white px-2 py-1 rounded-full font-bold uppercase tracking-wider">Você</span>
-            )}
-          </div>
-        ))}
-
-        {gameState.players.length < 2 && (
-            <div className="p-10 border-2 border-dashed border-[#0D3B66]/10 rounded-3xl flex flex-col items-center justify-center text-[#0D3B66]/20 text-center gap-3">
-                <div className="relative">
-                  <i className="fa-solid fa-user-plus text-4xl"></i>
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#F95738] rounded-full animate-ping"></div>
+        <div className="space-y-3">
+          {gameState.players.map((player, index) => (
+            <div
+              key={player.id}
+              style={{ animationDelay: `${index * 80}ms` }}
+              className="flex items-center justify-between p-5 bg-white rounded-3xl shadow-sm border-2 border-transparent transition-all animate-in slide-in-from-bottom-2 fade-in duration-300 fill-mode-both"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#F4D35E] border-2 border-[#0D3B66] flex items-center justify-center text-[#0D3B66] font-black text-xl shadow-sm">
+                  {player.name.charAt(0).toUpperCase()}
                 </div>
-                <p className="text-xs font-bold leading-relaxed max-w-[200px]">Mande o link para alguém entrar e começar a diversão!</p>
+                <div>
+                  <div className="font-black text-[#0D3B66] text-lg">{player.name}</div>
+                  {player.isHost && (
+                    <div className="flex items-center gap-1 text-[9px] text-[#EE964B] font-black uppercase tracking-tighter">
+                      <i className="fa-solid fa-crown"></i> Administrador
+                    </div>
+                  )}
+                </div>
+              </div>
+              {player.id === currentUserId && (
+                <span className="text-[10px] bg-[#0D3B66]/5 text-[#0D3B66] px-3 py-1.5 rounded-xl font-black border border-[#0D3B66]/10">VOCÊ</span>
+              )}
             </div>
-        )}
+          ))}
+
+          {gameState.players.length < 2 && (
+              <div className="py-12 px-6 border-4 border-dashed border-[#0D3B66]/10 rounded-[2.5rem] flex flex-col items-center justify-center text-[#0D3B66]/30 text-center gap-4">
+                  <div className="w-16 h-16 rounded-full bg-[#0D3B66]/5 flex items-center justify-center">
+                    <i className="fa-solid fa-user-plus text-3xl"></i>
+                  </div>
+                  <p className="text-sm font-bold leading-tight max-w-[200px]">Aguardando o próximo jogador entrar...</p>
+              </div>
+          )}
+        </div>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 pt-4 border-t border-[#0D3B66]/5">
         {isHost ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <button
               onClick={onStart}
               disabled={gameState.players.length < 2}
-              className={`w-full p-5 rounded-2xl font-black text-xl shadow-2xl transition-all flex items-center justify-center gap-3 ${
+              className={`w-full p-6 rounded-[2rem] font-black text-2xl shadow-2xl transition-all flex items-center justify-center gap-4 border-b-8 ${
                 gameState.players.length < 2
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'
-                  : 'bg-[#F95738] text-white active:scale-95 active:shadow-inner'
+                  ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
+                  : 'bg-[#F95738] text-white border-black/20 active:translate-y-1 active:border-b-4'
               }`}
             >
-              {gameState.players.length < 2 ? 'MÍNIMO 2 JOGADORES' : <>JOGAR AGORA <i className="fa-solid fa-play"></i></>}
+              {gameState.players.length < 2 ? (
+                <span className="text-lg">MÍNIMO 2 JOGADORES</span>
+              ) : (
+                <>DISTRIBUIR CARTAS <i className="fa-solid fa-bolt"></i></>
+              )}
             </button>
-            {gameState.players.length < 2 && (
-              <p className="text-[10px] text-center text-[#0D3B66]/50 font-bold uppercase tracking-tighter">O botão será liberado quando entrar mais alguém</p>
+            {gameState.players.length >= 2 && (
+              <p className="text-[10px] text-center text-[#0D3B66]/50 font-black uppercase tracking-widest">Como Admin, você inicia a rodada</p>
             )}
           </div>
         ) : (
-          <div className="text-center p-8 bg-white rounded-2xl border-2 border-[#0D3B66]/5 shadow-inner">
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <div className="w-2 h-2 bg-[#F95738] rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-[#F95738] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-              <div className="w-2 h-2 bg-[#F95738] rounded-full animate-bounce [animation-delay:-0.5s]"></div>
+          <div className="text-center p-8 bg-white/50 rounded-[2rem] border-2 border-dashed border-[#0D3B66]/10">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <span className="w-2 h-2 bg-[#F95738] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+              <span className="w-2 h-2 bg-[#F95738] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+              <span className="w-2 h-2 bg-[#F95738] rounded-full animate-bounce"></span>
             </div>
-            <p className="text-[#0D3B66] font-black italic uppercase text-xs tracking-widest">Aguardando o Host iniciar...</p>
+            <p className="text-[#0D3B66] font-black uppercase text-xs tracking-[0.2em] opacity-60 italic">Esperando o Admin começar...</p>
           </div>
         )}
       </div>
