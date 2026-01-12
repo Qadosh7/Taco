@@ -16,11 +16,21 @@ const App: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [urlRoomCode, setUrlRoomCode] = useState<string>('');
   const [isConnected, setIsConnected] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   
   const isUpdatingRef = useRef(false);
   const channelRef = useRef<any>(null);
 
-  // Sincroniza apenas LÓGICA CRÍTICA via RPC (Atomic Update)
+  // NOVO: Captura o código da sala da URL (?room=XXXX)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get('room');
+    if (room) {
+      console.log("Sala detectada na URL:", room);
+      setUrlRoomCode(room.toUpperCase());
+    }
+  }, []);
+
   const syncStateToDb = async (newState: GameState) => {
     if (isUpdatingRef.current) return;
     isUpdatingRef.current = true;
@@ -30,24 +40,22 @@ const App: React.FC = () => {
       const stateToSave = { 
         ...newState, 
         version: incrementedVersion,
-        reactions: [], // Efêmero via Broadcast
-        chat: []       // Efêmero via Broadcast
+        reactions: [], 
+        chat: []
       };
 
-      // Chama a função SQL RPC para garantir atomicidade (Race Condition protection)
       const { error } = await supabase.rpc('update_room_state_atomic', {
         p_code: newState.roomCode,
         p_new_state: stateToSave
       });
       
       if (error) {
-        console.warn('Conflito de versão detectado, recarregando estado...');
-        // O listener de DB cuidará de resetar o estado local
+        console.warn('Conflito de versão ou RPC ausente:', error.message);
       } else {
         setGameState(prev => prev ? { ...prev, version: incrementedVersion } : null);
       }
     } catch (err) {
-      console.error('Erro na sincronização atômica:', err);
+      console.error('Erro na sincronização:', err);
     } finally {
       setTimeout(() => { isUpdatingRef.current = false; }, 150);
     }
@@ -67,15 +75,11 @@ const App: React.FC = () => {
       .on('presence', { event: 'sync' }, () => {
         const presenceState = channel.presenceState();
         const onlineIds = Object.keys(presenceState);
-        
         setGameState(prev => {
           if (!prev) return null;
           return {
             ...prev,
-            players: prev.players.map(p => ({
-              ...p,
-              isOnline: onlineIds.includes(p.id)
-            }))
+            players: prev.players.map(p => ({ ...p, isOnline: onlineIds.includes(p.id) }))
           };
         });
       })
@@ -84,12 +88,8 @@ const App: React.FC = () => {
         if (!isUpdatingRef.current) {
           setGameState(prev => {
             if (!prev || newState.version > prev.version) {
-              // Preserva status online localmente
               const onlineIds = Object.keys(channel.presenceState());
-              const updatedPlayers = newState.players.map(p => ({
-                ...p,
-                isOnline: onlineIds.includes(p.id)
-              }));
+              const updatedPlayers = newState.players.map(p => ({ ...p, isOnline: onlineIds.includes(p.id) }));
               return { ...newState, players: updatedPlayers, reactions: prev?.reactions || [], chat: prev?.chat || [] };
             }
             return prev;
@@ -106,10 +106,7 @@ const App: React.FC = () => {
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           setIsConnected(true);
-          await channel.track({ 
-            user_id: currentUserId,
-            online_at: new Date().toISOString()
-          });
+          await channel.track({ user_id: currentUserId, online_at: new Date().toISOString() });
         } else {
           setIsConnected(false);
         }
@@ -126,26 +123,50 @@ const App: React.FC = () => {
       roomCode: code, phase: GamePhase.LOBBY, players: [{ id: adminId, name: adminName, hand: [], isHost: true, cardsPlayedThisRound: 0, avatar, isOnline: true }],
       currentTurnIndex: 0, tablePile: [], lastLoserId: null, winnerId: null, reactions: [], chat: [], version: 1, isSlapActive: false, slapRecords: []
     };
-    await supabase.from('rooms').insert([{ code, state: newState }]);
-    setCurrentUserId(adminId); setGameState(newState);
+    const { error } = await supabase.from('rooms').insert([{ code, state: newState }]);
+    if (error) return alert("Erro ao criar sala. Verifique sua conexão.");
+    
+    setCurrentUserId(adminId); 
+    setGameState(newState);
     HapticService.vibrateJoin(); AudioService.playSuccess();
   }, []);
 
   const handleJoinRoom = useCallback(async (code: string, playerName: string, avatar: PlayerAvatar) => {
+    if (isJoining) return;
+    setIsJoining(true);
     const cleanCode = code.toUpperCase().trim();
-    const { data } = await supabase.from('rooms').select('state').eq('code', cleanCode).single();
-    if (!data) return alert('Sala não encontrada.');
-    const currentState = data.state as GameState;
-    const playerId = Math.random().toString(36).substr(2, 9);
-    const newState = { ...currentState, players: [...currentState.players, { id: playerId, name: playerName, hand: [], isHost: false, cardsPlayedThisRound: 0, avatar, isOnline: true }], version: currentState.version + 1 };
     
-    // Usa RPC para entrar na sala com segurança
-    const { error } = await supabase.rpc('update_room_state_atomic', { p_code: cleanCode, p_new_state: newState });
-    if (error) return alert('Erro ao entrar (conflito de conexão). Tente de novo.');
+    try {
+      // 1. Busca o estado mais atualizado da sala
+      const { data, error: fetchError } = await supabase.from('rooms').select('state').eq('code', cleanCode).single();
+      if (fetchError || !data) throw new Error('Sala não encontrada. Verifique o código.');
 
-    setCurrentUserId(playerId); setGameState(newState);
-    HapticService.vibrateJoin(); AudioService.playSuccess();
-  }, []);
+      const currentState = data.state as GameState;
+      const playerId = Math.random().toString(36).substr(2, 9);
+      
+      // 2. Cria o novo estado com o novo jogador
+      const newState = { 
+        ...currentState, 
+        players: [...currentState.players, { id: playerId, name: playerName, hand: [], isHost: false, cardsPlayedThisRound: 0, avatar, isOnline: true }], 
+        version: currentState.version + 1 
+      };
+      
+      // 3. Tenta salvar atomicamente
+      const { error: rpcError } = await supabase.rpc('update_room_state_atomic', { p_code: cleanCode, p_new_state: newState });
+      if (rpcError) throw new Error('Não foi possível entrar na sala. Tente novamente.');
+
+      setCurrentUserId(playerId); 
+      setGameState(newState);
+      HapticService.vibrateJoin(); AudioService.playSuccess();
+      
+      // Limpa a URL para não ficar com o código da sala poluindo
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsJoining(false);
+    }
+  }, [isJoining]);
 
   const handleStartGame = useCallback(() => {
     if (!gameState) return;
@@ -157,61 +178,37 @@ const App: React.FC = () => {
 
   const handlePlayCard = useCallback(() => {
     if (!gameState || !currentUserId || gameState.isSlapActive) return;
-    
-    // Pula jogadores offline automaticamente
-    let nextIndex = gameState.currentTurnIndex;
-    const player = gameState.players[nextIndex];
+    const player = gameState.players[gameState.currentTurnIndex];
     if (player.id !== currentUserId) return;
 
     AudioService.playCard(); HapticService.vibrateCard();
     const newHand = [...player.hand];
     const playedCard = newHand.pop()!;
-    
     const currentWordInSequence = SEQUENCE[gameState.tablePile.length % 5];
     const isMatch = playedCard.type === currentWordInSequence || playedCard.isSpecial;
+    const updatedPlayers = gameState.players.map((p, idx) => idx === gameState.currentTurnIndex ? { ...p, hand: newHand, cardsPlayedThisRound: p.cardsPlayedThisRound + 1 } : p);
 
-    const updatedPlayers = gameState.players.map((p, idx) => 
-      idx === gameState.currentTurnIndex ? { ...p, hand: newHand, cardsPlayedThisRound: p.cardsPlayedThisRound + 1 } : p
-    );
-
-    // Encontra o próximo jogador online
     let searchIdx = (gameState.currentTurnIndex + 1) % gameState.players.length;
     while (!gameState.players[searchIdx].isOnline && searchIdx !== gameState.currentTurnIndex) {
       searchIdx = (searchIdx + 1) % gameState.players.length;
     }
 
-    const nextState: GameState = { 
-        ...gameState, 
-        players: updatedPlayers, 
-        tablePile: [...gameState.tablePile, playedCard], 
-        currentTurnIndex: searchIdx,
-        isSlapActive: isMatch,
-        slapRecords: []
-    };
+    const nextState: GameState = { ...gameState, players: updatedPlayers, tablePile: [...gameState.tablePile, playedCard], currentTurnIndex: searchIdx, isSlapActive: isMatch, slapRecords: [] };
     syncStateToDb(nextState);
   }, [gameState, currentUserId]);
 
   const handleSlap = useCallback(() => {
     if (!gameState || !currentUserId) return;
-    if (!gameState.isSlapActive) {
-      AudioService.playError();
-      handleResolveRound(currentUserId);
-      return;
-    }
+    if (!gameState.isSlapActive) { AudioService.playError(); handleResolveRound(currentUserId); return; }
     if (gameState.slapRecords.some(r => r.playerId === currentUserId)) return;
-
     const newRecord: SlapRecord = { playerId: currentUserId, timestamp: Date.now() };
     const updatedRecords = [...gameState.slapRecords, newRecord];
-
-    // Considera apenas jogadores online para o encerramento da rodada
     const onlinePlayers = gameState.players.filter(p => p.isOnline);
     if (updatedRecords.length >= onlinePlayers.length) {
-      const loserId = updatedRecords[updatedRecords.length - 1].playerId;
-      handleResolveRound(loserId);
+      handleResolveRound(updatedRecords[updatedRecords.length - 1].playerId);
     } else {
       const nextState = { ...gameState, slapRecords: updatedRecords };
-      setGameState(nextState);
-      syncStateToDb(nextState);
+      setGameState(nextState); syncStateToDb(nextState);
     }
   }, [gameState, currentUserId]);
 
@@ -219,33 +216,13 @@ const App: React.FC = () => {
     if (!gameState) return;
     AudioService.playSlap(); HapticService.vibrateLoss();
     const updatedPlayers = gameState.players.map(p => p.id === loserId ? { ...p, hand: [...gameState.tablePile, ...p.hand] } : p);
-    
     const gameWinner = updatedPlayers.find(p => p.hand.length === 0 && gameState.isSlapActive);
-    
-    const nextState: GameState = { 
-        ...gameState, 
-        players: updatedPlayers, 
-        tablePile: [], 
-        currentTurnIndex: gameState.players.findIndex(p => p.id === loserId), 
-        isSlapActive: false,
-        slapRecords: [],
-        winnerId: gameWinner ? gameWinner.id : null,
-        phase: gameWinner ? GamePhase.GAME_OVER : GamePhase.PLAYING
-    };
+    const nextState: GameState = { ...gameState, players: updatedPlayers, tablePile: [], currentTurnIndex: gameState.players.findIndex(p => p.id === loserId), isSlapActive: false, slapRecords: [], winnerId: gameWinner ? gameWinner.id : null, phase: gameWinner ? GamePhase.GAME_OVER : GamePhase.PLAYING };
     syncStateToDb(nextState);
   }, [gameState]);
 
-  const handleSendReaction = (emoji: string) => {
-    if (channelRef.current) channelRef.current.send({ type: 'broadcast', event: 'reaction', payload: { id: Math.random().toString(36).substr(2, 9), playerId: currentUserId, emoji, timestamp: Date.now() } });
-  };
-
-  const handleSendMessage = (text: string) => {
-    if (channelRef.current) {
-      const p = gameState?.players.find(p => p.id === currentUserId);
-      channelRef.current.send({ type: 'broadcast', event: 'chat', payload: { id: Math.random().toString(36).substr(2, 9), playerId: currentUserId, playerName: p?.name, text, timestamp: Date.now(), color: p?.avatar.color } });
-    }
-  };
-
+  const handleSendReaction = (emoji: string) => { if (channelRef.current) channelRef.current.send({ type: 'broadcast', event: 'reaction', payload: { id: Math.random().toString(36).substr(2, 9), playerId: currentUserId, emoji, timestamp: Date.now() } }); };
+  const handleSendMessage = (text: string) => { if (channelRef.current) { const p = gameState?.players.find(p => p.id === currentUserId); channelRef.current.send({ type: 'broadcast', event: 'chat', payload: { id: Math.random().toString(36).substr(2, 9), playerId: currentUserId, playerName: p?.name, text, timestamp: Date.now(), color: p?.avatar.color } }); } };
   const resetSession = () => { localStorage.removeItem('taco_session'); setGameState(null); setCurrentUserId(null); };
 
   return (
