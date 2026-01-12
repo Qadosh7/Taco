@@ -14,11 +14,13 @@
             font-family: 'Fredoka', sans-serif;
             background-color: #FAF0CA;
             background-image: radial-gradient(#EE964B 0.5px, transparent 0.5px);
-            background-size: 24px 24px;
+            background-size: 32px 32px;
             color: #1A1A1A;
-            overflow-x: hidden;
+            overflow: hidden;
             user-select: none;
             -webkit-tap-highlight-color: transparent;
+            height: 100vh;
+            width: 100vw;
         }
 
         .bg-pattern {
@@ -29,24 +31,33 @@
             height: 100%;
             pointer-events: none;
             z-index: -1;
-            opacity: 0.1;
-            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zM80 46c3.313 0 6-2.687 6-6s-2.687-6-6-6-6 2.687-6 6 2.687 6 6 6zM52 4c3.313 0 6-2.687 6-6s-2.687-6-6-6-6 2.687-6 6 2.687 6 6 6zM5 61c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM88 64c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM77 85c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM52 97c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM28 6c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 35c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM57 63c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM95 94c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM32 48c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM65 8c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM45 80c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM85 97c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM73 24c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23F95738' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E");
+            opacity: 0.05;
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zM80 46c3.313 0 6-2.687 6-6s-2.687-6-6-6-6 2.687-6 6 2.687 6 6 6zM52 4c3.313 0 6-2.687 6-6s-2.687-6-6-6-6 2.687-6 6 2.687 6 6 6zM5 61c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM88 64c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM77 85c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM52 97c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM28 6c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 35c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM57 63c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM95 94c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM32 48c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23F95738' fill-opacity='0.4' fill-rule='evenodd'/%3E%3C/svg%3E");
         }
 
         .floating-emoji {
             position: fixed;
-            font-size: 3rem;
             z-index: -1;
             opacity: 0.15;
-            animation: float 10s infinite linear;
             pointer-events: none;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.1));
+            animation: drift 20s infinite ease-in-out;
         }
 
-        @keyframes float {
-            0% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-100px) rotate(180deg); }
-            100% { transform: translateY(0px) rotate(360deg); }
+        @keyframes drift {
+            0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+            25% { transform: translate(15px, -30px) rotate(5deg) scale(1.05); }
+            50% { transform: translate(-10px, -60px) rotate(-5deg) scale(0.95); }
+            75% { transform: translate(-25px, -30px) rotate(3deg) scale(1.02); }
+            100% { transform: translate(0, 0) rotate(0deg) scale(1); }
         }
+
+        /* Efeito de desfoque para profundidade */
+        .blur-sm { filter: blur(2px) drop-shadow(0 5px 15px rgba(0,0,0,0.1)); }
+        .blur-md { filter: blur(4px) drop-shadow(0 5px 15px rgba(0,0,0,0.1)); }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 <script type="importmap">
 {
@@ -63,12 +74,13 @@
 </head>
 <body>
     <div class="bg-pattern"></div>
-    <!-- Emojis flutuantes de fundo -->
-    <div class="floating-emoji" style="top: 10%; left: 5%; animation-delay: 0s;">🌮</div>
-    <div class="floating-emoji" style="top: 40%; left: 85%; animation-delay: 2s;">🐱</div>
-    <div class="floating-emoji" style="top: 70%; left: 15%; animation-delay: 4s;">🐐</div>
-    <div class="floating-emoji" style="top: 85%; left: 75%; animation-delay: 1s;">🍕</div>
-    <div class="floating-emoji" style="top: 20%; left: 60%; animation-delay: 3s;">🧀</div>
+    
+    <!-- Emojis flutuantes com variação de profundidade e velocidade -->
+    <div class="floating-emoji text-6xl" style="top: 10%; left: 5%; animation-delay: 0s; animation-duration: 25s;">🌮</div>
+    <div class="floating-emoji text-5xl blur-sm" style="top: 40%; left: 85%; animation-delay: -2s; animation-duration: 30s;">🐱</div>
+    <div class="floating-emoji text-7xl blur-md" style="top: 70%; left: 15%; animation-delay: -4s; animation-duration: 22s;">🐐</div>
+    <div class="floating-emoji text-4xl" style="top: 85%; left: 75%; animation-delay: -1s; animation-duration: 28s;">🍕</div>
+    <div class="floating-emoji text-6xl blur-sm" style="top: 20%; left: 60%; animation-delay: -3s; animation-duration: 35s;">🧀</div>
     
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
