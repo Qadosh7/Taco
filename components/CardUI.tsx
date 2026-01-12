@@ -30,14 +30,12 @@ const CardUI: React.FC<CardUIProps> = ({ card, faceDown, onClick, className = ''
     return (
       <div
         onClick={onClick}
-        className={`w-24 h-36 rounded-2xl border-4 border-white shadow-lg flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${className}`}
+        className={`w-24 h-36 rounded-[2rem] border-[6px] border-white shadow-[0_10px_20px_rgba(0,0,0,0.15)] flex items-center justify-center cursor-pointer transition-transform active:scale-90 ${className}`}
         style={{ ...style, backgroundColor: COLORS.NAVY }}
       >
-        <div className="w-16 h-24 border-2 border-white/20 rounded-xl flex flex-col items-center justify-center">
-          <span className="text-white font-black text-xs tracking-tighter mb-1 opacity-40 uppercase">Taco</span>
-          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-             <i className="fa-solid fa-bolt text-white/20 text-sm"></i>
-          </div>
+        <div className="w-16 h-24 border-4 border-white/20 rounded-[1.5rem] flex flex-col items-center justify-center">
+          <div className="text-3xl opacity-30">✨</div>
+          <span className="text-white font-black text-[10px] tracking-widest mt-2 opacity-30 uppercase">TACO</span>
         </div>
       </div>
     );
@@ -49,23 +47,23 @@ const CardUI: React.FC<CardUIProps> = ({ card, faceDown, onClick, className = ''
     <div
       onClick={onClick}
       style={style}
-      className={`w-24 h-36 rounded-2xl bg-white border-2 border-[#0D3B66]/10 shadow-xl flex flex-col items-center justify-between p-3 relative select-none overflow-hidden ${className} ${card.isSpecial ? 'ring-4 ring-[#F4D35E]' : ''}`}
+      className={`w-24 h-36 rounded-[2rem] bg-white border-[6px] border-[#0D3B66]/5 shadow-[0_10px_20px_rgba(0,0,0,0.1)] flex flex-col items-center justify-between p-4 relative select-none overflow-hidden ${className} ${card.isSpecial ? 'ring-8 ring-[#F4D35E]/50' : ''}`}
     >
-      <div className="w-full flex justify-between items-center">
-        <span className="text-[10px] font-black text-[#0D3B66] uppercase tracking-tighter">{card.name}</span>
-        {card.isSpecial && <i className="fa-solid fa-star text-[#F4D35E] text-[8px]"></i>}
+      <div className="w-full flex justify-center items-center">
+        <span className="text-[10px] font-black text-[#0D3B66] uppercase tracking-tighter bg-[#0D3B66]/5 px-2 py-0.5 rounded-full">{card.name}</span>
       </div>
       
-      <div className="text-4xl drop-shadow-sm">{getIcon(card.type)}</div>
+      <div className="text-5xl drop-shadow-md transform scale-110">{getIcon(card.type)}</div>
       
-      <div className="w-full text-center">
-         <div className={`h-1.5 w-full rounded-full ${card.isSpecial ? 'bg-[#F4D35E]' : 'bg-[#0D3B66]/5'}`}></div>
-         <span className="text-[8px] font-bold text-[#0D3B66]/40 uppercase mt-1 block">Taco Online</span>
+      <div className="w-full text-center flex justify-center gap-1">
+         {[...Array(3)].map((_, i) => (
+           <div key={i} className={`h-2 w-2 rounded-full ${card.isSpecial ? 'bg-[#F4D35E]' : 'bg-[#0D3B66]/10'}`}></div>
+         ))}
       </div>
 
-      {/* Marca d'água de fundo */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
-         <span className="text-8xl transform -rotate-12">{getIcon(card.type)}</span>
+      {/* Marca d'água de fundo infantil */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none">
+         <span className="text-9xl transform -rotate-12">{getIcon(card.type)}</span>
       </div>
     </div>
   );
