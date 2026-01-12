@@ -30,12 +30,7 @@ const Lobby: React.FC<LobbyProps> = ({ gameState, currentUserId, onStart, onQuit
         throw new Error('Share not supported');
       }
     } catch (err) {
-      // Fallback to clipboard for non-mobile or if sharing fails/is cancelled
-      if (err instanceof Error && err.name !== 'AbortError') {
-        copyToClipboard(shareUrl);
-      } else if (!(err instanceof Error)) {
-         copyToClipboard(shareUrl);
-      }
+      copyToClipboard(shareUrl);
     }
   };
 
@@ -46,7 +41,6 @@ const Lobby: React.FC<LobbyProps> = ({ gameState, currentUserId, onStart, onQuit
       setTimeout(() => setCopied(false), 2500);
     } catch (err) {
       console.error('Falha ao copiar:', err);
-      alert('Não foi possível copiar o link automaticamente.');
     }
   };
 
@@ -91,15 +85,22 @@ const Lobby: React.FC<LobbyProps> = ({ gameState, currentUserId, onStart, onQuit
           <div className="absolute -right-2 -top-2 w-6 h-6 flex items-center justify-center bg-[#F4D35E] border-2 border-[#0D3B66] rounded-full text-[#0D3B66] text-[10px]">
             {codeCopied ? <i className="fa-solid fa-check"></i> : <i className="fa-solid fa-copy"></i>}
           </div>
-          {codeCopied && (
-            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] text-[#0D3B66] font-bold bg-[#F4D35E] px-2 py-0.5 rounded shadow-sm whitespace-nowrap animate-in fade-in slide-in-from-top-1">Copiado!</span>
-          )}
         </div>
       </div>
 
       <div className="text-center mb-8">
         <h2 className="text-3xl font-black text-[#0D3B66] leading-tight">Sua sala está<br/>pronta!</h2>
         <p className="text-sm text-[#1A1A1A] opacity-70 mt-2 font-medium">Convide a galera para bater Taco</p>
+      </div>
+
+      {/* Alerta de Sincronização Local */}
+      <div className="bg-[#0D3B66]/5 border border-[#0D3B66]/10 p-4 rounded-2xl mb-8 text-center">
+        <p className="text-[10px] font-bold text-[#0D3B66]/60 uppercase tracking-widest">
+          <i className="fa-solid fa-circle-info mr-1"></i> Modo de Demonstração
+        </p>
+        <p className="text-[9px] text-[#0D3B66]/40 leading-tight mt-1">
+          Atualmente, a sincronização funciona entre abas do mesmo navegador. Para jogar em celulares diferentes, integre com um banco de dados real.
+        </p>
       </div>
 
       <div className="relative mb-12">
@@ -113,14 +114,7 @@ const Lobby: React.FC<LobbyProps> = ({ gameState, currentUserId, onStart, onQuit
             <i className={`fa-solid ${copied ? 'fa-check-circle' : 'fa-share-nodes'} text-2xl`}></i>
             <span>{copied ? 'LINK NA MÃO!' : 'CONVIDAR GALERA'}</span>
           </div>
-          {!copied && <span className="text-[10px] opacity-80 font-bold uppercase tracking-widest">Clique para compartilhar</span>}
         </button>
-        
-        {copied && (
-          <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-[#0D3B66] text-white text-[10px] font-black px-4 py-1.5 rounded-full shadow-lg animate-bounce">
-            LINK COPIADO COM SUCESSO!
-          </div>
-        )}
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto px-1">
@@ -133,8 +127,7 @@ const Lobby: React.FC<LobbyProps> = ({ gameState, currentUserId, onStart, onQuit
           {gameState.players.map((player, index) => (
             <div
               key={player.id}
-              style={{ animationDelay: `${index * 80}ms` }}
-              className="flex items-center justify-between p-5 bg-white rounded-3xl shadow-sm border-2 border-transparent transition-all animate-in slide-in-from-bottom-2 fade-in duration-300 fill-mode-both"
+              className="flex items-center justify-between p-5 bg-white rounded-3xl shadow-sm border-2 border-transparent transition-all animate-in slide-in-from-bottom-2 fade-in"
             >
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-[#F4D35E] border-2 border-[#0D3B66] flex items-center justify-center text-[#0D3B66] font-black text-xl shadow-sm">
@@ -154,47 +147,28 @@ const Lobby: React.FC<LobbyProps> = ({ gameState, currentUserId, onStart, onQuit
               )}
             </div>
           ))}
-
-          {gameState.players.length < 2 && (
-              <div className="py-12 px-6 border-4 border-dashed border-[#0D3B66]/10 rounded-[2.5rem] flex flex-col items-center justify-center text-[#0D3B66]/30 text-center gap-4">
-                  <div className="w-16 h-16 rounded-full bg-[#0D3B66]/5 flex items-center justify-center">
-                    <i className="fa-solid fa-user-plus text-3xl"></i>
-                  </div>
-                  <p className="text-sm font-bold leading-tight max-w-[200px]">Aguardando o próximo jogador entrar...</p>
-              </div>
-          )}
         </div>
       </div>
 
       <div className="mt-8 pt-4 border-t border-[#0D3B66]/5">
         {isHost ? (
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={onStart}
-              disabled={gameState.players.length < 2}
-              className={`w-full p-6 rounded-[2rem] font-black text-2xl shadow-2xl transition-all flex items-center justify-center gap-4 border-b-8 ${
-                gameState.players.length < 2
-                  ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
-                  : 'bg-[#F95738] text-white border-black/20 active:translate-y-1 active:border-b-4'
-              }`}
-            >
-              {gameState.players.length < 2 ? (
-                <span className="text-lg">MÍNIMO 2 JOGADORES</span>
-              ) : (
-                <>DISTRIBUIR CARTAS <i className="fa-solid fa-bolt"></i></>
-              )}
-            </button>
-            {gameState.players.length >= 2 && (
-              <p className="text-[10px] text-center text-[#0D3B66]/50 font-black uppercase tracking-widest">Como Admin, você inicia a rodada</p>
+          <button
+            onClick={onStart}
+            disabled={gameState.players.length < 2}
+            className={`w-full p-6 rounded-[2rem] font-black text-2xl shadow-2xl transition-all flex items-center justify-center gap-4 border-b-8 ${
+              gameState.players.length < 2
+                ? 'bg-gray-200 text-gray-400 border-gray-300 cursor-not-allowed shadow-none'
+                : 'bg-[#F95738] text-white border-black/20 active:translate-y-1 active:border-b-4'
+            }`}
+          >
+            {gameState.players.length < 2 ? (
+              <span className="text-lg">AGUARDANDO PLAYERS...</span>
+            ) : (
+              <>COMEÇAR JOGO <i className="fa-solid fa-bolt"></i></>
             )}
-          </div>
+          </button>
         ) : (
           <div className="text-center p-8 bg-white/50 rounded-[2rem] border-2 border-dashed border-[#0D3B66]/10">
-            <div className="flex items-center justify-center gap-2 mb-3">
-              <span className="w-2 h-2 bg-[#F95738] rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-              <span className="w-2 h-2 bg-[#F95738] rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-              <span className="w-2 h-2 bg-[#F95738] rounded-full animate-bounce"></span>
-            </div>
             <p className="text-[#0D3B66] font-black uppercase text-xs tracking-[0.2em] opacity-60 italic">Esperando o Admin começar...</p>
           </div>
         )}

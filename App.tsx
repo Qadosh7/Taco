@@ -13,7 +13,6 @@ const App: React.FC = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [urlRoomCode, setUrlRoomCode] = useState<string>('');
   
-  // Sincronização em tempo real simulada (Funciona entre abas/janelas)
   const syncChannel = useRef<BroadcastChannel | null>(null);
 
   useEffect(() => {
@@ -25,24 +24,31 @@ const App: React.FC = () => {
       if (type === 'SYNC_STATE') {
         setGameState(payload);
       } else if (type === 'PLAYER_JOINED') {
-        // Se eu sou o host, eu recebo o novo player e atualizo todo mundo
         setGameState(prev => {
-          if (!prev || !prev.players.find(p => p.id === currentUserId)?.isHost) return prev;
+          if (!prev) return prev;
+          const isHost = prev.players.find(p => p.id === currentUserId)?.isHost;
+          if (!isHost) return prev;
+
+          // Se eu sou o host, adiciono o player se ele não existir
+          if (prev.players.find(p => p.id === payload.id)) return prev;
+          
           const newState = { ...prev, players: [...prev.players, payload] };
-          broadcastState(newState);
+          // Envia o estado completo de volta para todos
+          syncChannel.current?.postMessage({ type: 'SYNC_STATE', payload: newState });
           return newState;
         });
       }
     };
 
-    return () => syncChannel.current?.close();
+    return () => {
+      syncChannel.current?.close();
+    };
   }, [currentUserId]);
 
   const broadcastState = (state: GameState) => {
     syncChannel.current?.postMessage({ type: 'SYNC_STATE', payload: state });
   };
 
-  // Check URL for room code on mount
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const room = params.get('room');
@@ -51,7 +57,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Persistence
   useEffect(() => {
     const saved = localStorage.getItem('taco_session');
     if (saved) {
@@ -87,8 +92,8 @@ const App: React.FC = () => {
       winnerId: null
     };
 
-    setGameState(newState);
     setCurrentUserId(adminId);
+    setGameState(newState);
     HapticService.vibrateJoin();
     AudioService.playSuccess();
     broadcastState(newState);
@@ -105,11 +110,26 @@ const App: React.FC = () => {
     };
 
     setCurrentUserId(playerId);
+    
+    // Cria um estado inicial local para o player que está entrando entrar no Lobby
+    const initialJoinState: GameState = {
+      roomCode: code,
+      phase: GamePhase.LOBBY,
+      players: [newPlayer],
+      currentTurnIndex: 0,
+      tablePile: [],
+      lastLoserId: null,
+      winnerId: null
+    };
+    
+    setGameState(initialJoinState);
     HapticService.vibrateJoin();
     AudioService.playSuccess();
 
-    // Envia sinal de entrada para quem estiver na sala
-    syncChannel.current?.postMessage({ type: 'PLAYER_JOINED', payload: newPlayer });
+    // Notifica o canal. O Host responderá com o estado completo se estiver online.
+    setTimeout(() => {
+      syncChannel.current?.postMessage({ type: 'PLAYER_JOINED', payload: newPlayer });
+    }, 100);
   }, []);
 
   const handleStartGame = useCallback(() => {
@@ -138,80 +158,78 @@ const App: React.FC = () => {
     AudioService.playCard();
     HapticService.vibrateCard();
 
-    if (player.hand.length === 0) {
-        const nextState = {
-          ...gameState,
-          currentTurnIndex: (gameState.currentTurnIndex + 1) % gameState.players.length
-        };
-        setGameState(nextState);
-        broadcastState(nextState);
-        return;
+    const playerIdx = gameState.currentTurnIndex;
+    const currentPlayer = gameState.players[playerIdx];
+    
+    if (currentPlayer.hand.length === 0) {
+      const nextState = {
+        ...gameState,
+        currentTurnIndex: (gameState.currentTurnIndex + 1) % gameState.players.length
+      };
+      setGameState(nextState);
+      broadcastState(nextState);
+      return;
     }
 
-    const newHand = [...player.hand];
+    const newHand = [...currentPlayer.hand];
     const playedCard = newHand.pop()!;
 
-    setGameState(prev => {
-      if (!prev) return null;
-      const updatedPlayers = prev.players.map((p, idx) => {
-        if (idx === prev.currentTurnIndex) {
-          return { ...p, hand: newHand, cardsPlayedThisRound: p.cardsPlayedThisRound + 1 };
-        }
-        return p;
-      });
-
-      const nextState = {
-        ...prev,
-        players: updatedPlayers,
-        tablePile: [...prev.tablePile, playedCard],
-        currentTurnIndex: (prev.currentTurnIndex + 1) % prev.players.length
-      };
-      
-      broadcastState(nextState);
-      return nextState;
+    const updatedPlayers = gameState.players.map((p, idx) => {
+      if (idx === playerIdx) {
+        return { ...p, hand: newHand, cardsPlayedThisRound: p.cardsPlayedThisRound + 1 };
+      }
+      return p;
     });
+
+    const nextState = {
+      ...gameState,
+      players: updatedPlayers,
+      tablePile: [...gameState.tablePile, playedCard],
+      currentTurnIndex: (gameState.currentTurnIndex + 1) % gameState.players.length
+    };
+    
+    setGameState(nextState);
+    broadcastState(nextState);
   }, [gameState, currentUserId]);
 
   const handleResolveRound = useCallback((loserId: string) => {
+    if (!gameState) return;
     AudioService.playSlap();
     HapticService.vibrateLoss();
 
-    setGameState(prev => {
-      if (!prev) return null;
-      const updatedPlayers = prev.players.map(p => {
-        if (p.id === loserId) {
-          return { ...p, hand: [...p.hand, ...prev.tablePile] };
-        }
-        return p;
-      });
-
-      const totalCards = 52;
-      const gameLoser = updatedPlayers.find(p => p.hand.length === totalCards);
-
-      let nextState;
-      if (gameLoser) {
-          nextState = {
-              ...prev,
-              players: updatedPlayers,
-              phase: GamePhase.GAME_OVER,
-              tablePile: [],
-              lastLoserId: loserId,
-              winnerId: gameLoser.id
-          };
-      } else {
-          nextState = {
-            ...prev,
-            players: updatedPlayers,
-            tablePile: [],
-            currentTurnIndex: prev.players.findIndex(p => p.id === loserId),
-            phase: GamePhase.PLAYING
-          };
+    const updatedPlayers = gameState.players.map(p => {
+      if (p.id === loserId) {
+        return { ...p, hand: [...p.hand, ...gameState.tablePile] };
       }
-      
-      broadcastState(nextState);
-      return nextState;
+      return p;
     });
-  }, []);
+
+    const totalCards = 52;
+    const gameLoser = updatedPlayers.find(p => p.hand.length >= totalCards);
+
+    let nextState;
+    if (gameLoser) {
+        nextState = {
+            ...gameState,
+            players: updatedPlayers,
+            phase: GamePhase.GAME_OVER,
+            tablePile: [],
+            lastLoserId: loserId,
+            winnerId: gameLoser.id
+        };
+    } else {
+        nextState = {
+          ...gameState,
+          players: updatedPlayers,
+          tablePile: [],
+          currentTurnIndex: gameState.players.findIndex(p => p.id === loserId),
+          phase: GamePhase.PLAYING
+        };
+    }
+    
+    setGameState(nextState);
+    broadcastState(nextState);
+  }, [gameState]);
 
   const resetSession = () => {
       localStorage.removeItem('taco_session');
