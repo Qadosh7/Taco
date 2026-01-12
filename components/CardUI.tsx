@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Card } from '../types';
+import { Card, CardType } from '../types';
 import { COLORS } from '../constants';
 
 interface CardUIProps {
@@ -11,16 +11,33 @@ interface CardUIProps {
   style?: React.CSSProperties;
 }
 
+const getIcon = (type: CardType) => {
+  switch (type) {
+    case CardType.TACO: return '🌮';
+    case CardType.GATO: return '🐱';
+    case CardType.CABRA: return '🐐';
+    case CardType.QUEIJO: return '🧀';
+    case CardType.PIZZA: return '🍕';
+    case CardType.GORILA: return '🦍';
+    case CardType.NARVAL: return '🐳';
+    case CardType.MARMOTA: return '🐹';
+    default: return '❓';
+  }
+};
+
 const CardUI: React.FC<CardUIProps> = ({ card, faceDown, onClick, className = '', style }) => {
   if (faceDown) {
     return (
       <div
         onClick={onClick}
-        className={`w-24 h-36 rounded-xl border-4 border-white shadow-lg flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${className}`}
+        className={`w-24 h-36 rounded-2xl border-4 border-white shadow-lg flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${className}`}
         style={{ ...style, backgroundColor: COLORS.NAVY }}
       >
-        <div className="w-16 h-24 border-2 border-white/20 rounded-lg flex items-center justify-center">
-          <span className="text-white/30 text-4xl font-bold">T</span>
+        <div className="w-16 h-24 border-2 border-white/20 rounded-xl flex flex-col items-center justify-center">
+          <span className="text-white font-black text-xs tracking-tighter mb-1 opacity-40 uppercase">Taco</span>
+          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+             <i className="fa-solid fa-bolt text-white/20 text-sm"></i>
+          </div>
         </div>
       </div>
     );
@@ -32,19 +49,23 @@ const CardUI: React.FC<CardUIProps> = ({ card, faceDown, onClick, className = ''
     <div
       onClick={onClick}
       style={style}
-      className={`w-24 h-36 rounded-xl bg-white border border-gray-200 shadow-md flex flex-col p-2 relative select-none ${className}`}
+      className={`w-24 h-36 rounded-2xl bg-white border-2 border-[#0D3B66]/10 shadow-xl flex flex-col items-center justify-between p-3 relative select-none overflow-hidden ${className} ${card.isSpecial ? 'ring-4 ring-[#F4D35E]' : ''}`}
     >
-      <div className={`text-lg font-bold ${card.color === 'red' ? 'text-red-600' : 'text-black'}`}>
-        {card.value}
+      <div className="w-full flex justify-between items-center">
+        <span className="text-[10px] font-black text-[#0D3B66] uppercase tracking-tighter">{card.name}</span>
+        {card.isSpecial && <i className="fa-solid fa-star text-[#F4D35E] text-[8px]"></i>}
       </div>
-      <div className={`text-xl ${card.color === 'red' ? 'text-red-600' : 'text-black'}`}>
-        {card.suit}
+      
+      <div className="text-4xl drop-shadow-sm">{getIcon(card.type)}</div>
+      
+      <div className="w-full text-center">
+         <div className={`h-1.5 w-full rounded-full ${card.isSpecial ? 'bg-[#F4D35E]' : 'bg-[#0D3B66]/5'}`}></div>
+         <span className="text-[8px] font-bold text-[#0D3B66]/40 uppercase mt-1 block">Taco Online</span>
       </div>
-      <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
-         <span className="text-6xl">{card.suit}</span>
-      </div>
-      <div className={`absolute bottom-2 right-2 text-lg font-bold rotate-180 ${card.color === 'red' ? 'text-red-600' : 'text-black'}`}>
-        {card.value}
+
+      {/* Marca d'água de fundo */}
+      <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+         <span className="text-8xl transform -rotate-12">{getIcon(card.type)}</span>
       </div>
     </div>
   );

@@ -1,9 +1,13 @@
 
-export enum Suit {
-  HEARTS = '♥️',
-  DIAMONDS = '♦️',
-  CLUBS = '♣️',
-  SPADES = '♠️'
+export enum CardType {
+  TACO = 'Taco',
+  GATO = 'Gato',
+  CABRA = 'Cabra',
+  QUEIJO = 'Queijo',
+  PIZZA = 'Pizza',
+  GORILA = 'Gorila',
+  NARVAL = 'Narval',
+  MARMOTA = 'Marmota'
 }
 
 export enum GamePhase {
@@ -15,9 +19,10 @@ export enum GamePhase {
 
 export interface Card {
   id: string;
-  suit: Suit;
-  value: string;
-  color: 'red' | 'black';
+  name: string;
+  type: CardType;
+  isSpecial: boolean;
+  image_front_url: string;
 }
 
 export interface Player {

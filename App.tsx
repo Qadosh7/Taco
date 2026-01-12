@@ -32,7 +32,6 @@ const App: React.FC = () => {
           filter: `code=eq.${gameState.roomCode}`,
         },
         (payload) => {
-          // Só atualizamos se a mudança não veio de nós mesmos para evitar loops
           if (!isUpdatingRef.current) {
             setGameState(payload.new.state as GameState);
           }
@@ -47,7 +46,6 @@ const App: React.FC = () => {
     };
   }, [gameState?.roomCode]);
 
-  // Função para salvar o estado no banco de dados
   const syncStateToDb = async (newState: GameState) => {
     isUpdatingRef.current = true;
     try {
@@ -60,7 +58,6 @@ const App: React.FC = () => {
     } catch (err) {
       console.error('Erro ao sincronizar com DB:', err);
     } finally {
-      // Pequeno delay para garantir que o evento de broadcast do próprio DB seja ignorado
       setTimeout(() => { isUpdatingRef.current = false; }, 500);
     }
   };
@@ -68,17 +65,13 @@ const App: React.FC = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const room = params.get('room');
-    if (room) {
-      setUrlRoomCode(room.toUpperCase());
-    }
+    if (room) setUrlRoomCode(room.toUpperCase());
   }, []);
 
-  // Tenta recuperar sessão anterior
   useEffect(() => {
     const saved = localStorage.getItem('taco_session');
     if (saved) {
       const { state, userId } = JSON.parse(saved);
-      // Validar se a sala ainda existe no banco
       supabase.from('rooms').select('state').eq('code', state.roomCode).single().then(({ data }) => {
         if (data) {
           setGameState(data.state as GameState);
@@ -90,7 +83,6 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Persistir no localStorage para reconexão rápida
   useEffect(() => {
     if (gameState && currentUserId) {
       localStorage.setItem('taco_session', JSON.stringify({ state: gameState, userId: currentUserId }));
@@ -119,13 +111,8 @@ const App: React.FC = () => {
       winnerId: null
     };
 
-    // Salva a nova sala no banco
     const { error } = await supabase.from('rooms').insert([{ code, state: newState }]);
-    
-    if (error) {
-      alert('Erro ao criar sala. Tente novamente.');
-      return;
-    }
+    if (error) return alert('Erro ao criar sala.');
 
     setCurrentUserId(adminId);
     setGameState(newState);
@@ -135,47 +122,16 @@ const App: React.FC = () => {
 
   const handleJoinRoom = useCallback(async (code: string, playerName: string) => {
     const cleanCode = code.toUpperCase().trim();
-    
-    // 1. Buscar estado atual da sala no banco
-    const { data, error } = await supabase
-      .from('rooms')
-      .select('state')
-      .eq('code', cleanCode)
-      .single();
-
-    if (error || !data) {
-      alert('Sala não encontrada. Verifique o código.');
-      return;
-    }
+    const { data, error } = await supabase.from('rooms').select('state').eq('code', cleanCode).single();
+    if (error || !data) return alert('Sala não encontrada.');
 
     const currentState = data.state as GameState;
     const playerId = Math.random().toString(36).substr(2, 9);
-    
-    // 2. Criar novo jogador
-    const newPlayer: Player = {
-      id: playerId,
-      name: playerName,
-      hand: [],
-      isHost: false,
-      cardsPlayedThisRound: 0
-    };
+    const newPlayer: Player = { id: playerId, name: playerName, hand: [], isHost: false, cardsPlayedThisRound: 0 };
+    const newState = { ...currentState, players: [...currentState.players, newPlayer] };
 
-    // 3. Atualizar estado com o novo jogador
-    const newState = {
-      ...currentState,
-      players: [...currentState.players, newPlayer]
-    };
-
-    // 4. Salvar de volta no banco
-    const { error: updateError } = await supabase
-      .from('rooms')
-      .update({ state: newState })
-      .eq('code', cleanCode);
-
-    if (updateError) {
-      alert('Erro ao entrar na sala.');
-      return;
-    }
+    const { error: updateError } = await supabase.from('rooms').update({ state: newState }).eq('code', cleanCode);
+    if (updateError) return alert('Erro ao entrar.');
 
     setCurrentUserId(playerId);
     setGameState(newState);
@@ -187,15 +143,7 @@ const App: React.FC = () => {
     if (!gameState) return;
     const deck = createDeck();
     const playersWithCards = distributeCards(gameState.players, deck);
-
-    const newState = {
-      ...gameState,
-      phase: GamePhase.PLAYING,
-      players: playersWithCards,
-      currentTurnIndex: 0,
-      tablePile: []
-    };
-
+    const newState = { ...gameState, phase: GamePhase.PLAYING, players: playersWithCards, currentTurnIndex: 0, tablePile: [] };
     setGameState(newState);
     AudioService.playDeal();
     syncStateToDb(newState);
@@ -206,14 +154,8 @@ const App: React.FC = () => {
     const player = gameState.players[gameState.currentTurnIndex];
     if (player.id !== currentUserId) return;
 
-    const playerIdx = gameState.currentTurnIndex;
-    const currentPlayer = gameState.players[playerIdx];
-    
-    if (currentPlayer.hand.length === 0) {
-      const nextState = {
-        ...gameState,
-        currentTurnIndex: (gameState.currentTurnIndex + 1) % gameState.players.length
-      };
+    if (player.hand.length === 0) {
+      const nextState = { ...gameState, currentTurnIndex: (gameState.currentTurnIndex + 1) % gameState.players.length };
       setGameState(nextState);
       syncStateToDb(nextState);
       return;
@@ -221,24 +163,12 @@ const App: React.FC = () => {
 
     AudioService.playCard();
     HapticService.vibrateCard();
-
-    const newHand = [...currentPlayer.hand];
+    const newHand = [...player.hand];
     const playedCard = newHand.pop()!;
-
-    const updatedPlayers = gameState.players.map((p, idx) => {
-      if (idx === playerIdx) {
-        return { ...p, hand: newHand, cardsPlayedThisRound: p.cardsPlayedThisRound + 1 };
-      }
-      return p;
-    });
-
-    const nextState: GameState = {
-      ...gameState,
-      players: updatedPlayers,
-      tablePile: [...gameState.tablePile, playedCard],
-      currentTurnIndex: (gameState.currentTurnIndex + 1) % gameState.players.length
-    };
-    
+    const updatedPlayers = gameState.players.map((p, idx) => 
+      idx === gameState.currentTurnIndex ? { ...p, hand: newHand, cardsPlayedThisRound: p.cardsPlayedThisRound + 1 } : p
+    );
+    const nextState: GameState = { ...gameState, players: updatedPlayers, tablePile: [...gameState.tablePile, playedCard], currentTurnIndex: (gameState.currentTurnIndex + 1) % gameState.players.length };
     setGameState(nextState);
     syncStateToDb(nextState);
   }, [gameState, currentUserId]);
@@ -247,37 +177,19 @@ const App: React.FC = () => {
     if (!gameState) return;
     AudioService.playSlap();
     HapticService.vibrateLoss();
-
-    const updatedPlayers = gameState.players.map(p => {
-      if (p.id === loserId) {
-        return { ...p, hand: [...p.hand, ...gameState.tablePile] };
-      }
-      return p;
-    });
-
-    const totalCards = 52;
+    const updatedPlayers = gameState.players.map(p => p.id === loserId ? { ...p, hand: [...p.hand, ...gameState.tablePile] } : p);
+    
+    // Regra oficial: o jogo acaba quando alguém atinge o limite do baralho ou uma condição de vitória é definida pelo grupo
+    // No app, mantemos a derrota se atingir a capacidade total do baralho original (64 cartas)
+    const totalCards = 64; 
     const gameLoser = updatedPlayers.find(p => p.hand.length >= totalCards);
 
     let nextState: GameState;
     if (gameLoser) {
-        nextState = {
-            ...gameState,
-            players: updatedPlayers,
-            phase: GamePhase.GAME_OVER,
-            tablePile: [],
-            lastLoserId: loserId,
-            winnerId: gameLoser.id
-        };
+        nextState = { ...gameState, players: updatedPlayers, phase: GamePhase.GAME_OVER, tablePile: [], lastLoserId: loserId, winnerId: gameLoser.id };
     } else {
-        nextState = {
-          ...gameState,
-          players: updatedPlayers,
-          tablePile: [],
-          currentTurnIndex: gameState.players.findIndex(p => p.id === loserId),
-          phase: GamePhase.PLAYING
-        };
+        nextState = { ...gameState, players: updatedPlayers, tablePile: [], currentTurnIndex: gameState.players.findIndex(p => p.id === loserId), phase: GamePhase.PLAYING };
     }
-    
     setGameState(nextState);
     syncStateToDb(nextState);
   }, [gameState]);
@@ -294,23 +206,10 @@ const App: React.FC = () => {
       {!gameState ? (
         <JoinScreen initialCode={urlRoomCode} onCreate={handleCreateRoom} onJoin={handleJoinRoom} />
       ) : gameState.phase === GamePhase.LOBBY ? (
-        <Lobby
-          gameState={gameState}
-          currentUserId={currentUserId!}
-          onStart={handleStartGame}
-          onQuit={resetSession}
-        />
+        <Lobby gameState={gameState} currentUserId={currentUserId!} onStart={handleStartGame} onQuit={resetSession} />
       ) : (
-        <GameBoard
-          gameState={gameState}
-          currentUserId={currentUserId!}
-          onPlay={handlePlayCard}
-          onResolve={handleResolveRound}
-          onQuit={resetSession}
-        />
+        <GameBoard gameState={gameState} currentUserId={currentUserId!} onPlay={handlePlayCard} onResolve={handleResolveRound} onQuit={resetSession} />
       )}
-      
-      {/* Indicador de Status de Conexão Realtime */}
       {gameState && (
         <div className={`fixed bottom-2 right-2 text-[8px] font-black uppercase px-2 py-1 rounded-full border shadow-sm z-50 transition-colors ${isConnected ? 'bg-green-100 border-green-200 text-green-600' : 'bg-red-100 border-red-200 text-red-600'}`}>
           {isConnected ? '● Conectado' : '○ Reconectando...'}
