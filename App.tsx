@@ -7,46 +7,62 @@ import GameBoard from './components/GameBoard';
 import JoinScreen from './components/JoinScreen';
 import { AudioService } from './services/audioService';
 import { HapticService } from './services/hapticService';
+import { supabase } from './services/supabase';
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [urlRoomCode, setUrlRoomCode] = useState<string>('');
+  const [isConnected, setIsConnected] = useState(false);
   
-  const syncChannel = useRef<BroadcastChannel | null>(null);
+  const isUpdatingRef = useRef(false);
 
+  // Sincronização em tempo real via Database Changes
   useEffect(() => {
-    syncChannel.current = new BroadcastChannel('taco_game_sync');
-    
-    syncChannel.current.onmessage = (event) => {
-      const { type, payload } = event.data;
-      
-      if (type === 'SYNC_STATE') {
-        setGameState(payload);
-      } else if (type === 'PLAYER_JOINED') {
-        setGameState(prev => {
-          if (!prev) return prev;
-          const isHost = prev.players.find(p => p.id === currentUserId)?.isHost;
-          if (!isHost) return prev;
+    if (!gameState?.roomCode) return;
 
-          // Se eu sou o host, adiciono o player se ele não existir
-          if (prev.players.find(p => p.id === payload.id)) return prev;
-          
-          const newState = { ...prev, players: [...prev.players, payload] };
-          // Envia o estado completo de volta para todos
-          syncChannel.current?.postMessage({ type: 'SYNC_STATE', payload: newState });
-          return newState;
-        });
-      }
-    };
+    const channel = supabase
+      .channel(`room_db_${gameState.roomCode}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'rooms',
+          filter: `code=eq.${gameState.roomCode}`,
+        },
+        (payload) => {
+          // Só atualizamos se a mudança não veio de nós mesmos para evitar loops
+          if (!isUpdatingRef.current) {
+            setGameState(payload.new.state as GameState);
+          }
+        }
+      )
+      .subscribe((status) => {
+        setIsConnected(status === 'SUBSCRIBED');
+      });
 
     return () => {
-      syncChannel.current?.close();
+      supabase.removeChannel(channel);
     };
-  }, [currentUserId]);
+  }, [gameState?.roomCode]);
 
-  const broadcastState = (state: GameState) => {
-    syncChannel.current?.postMessage({ type: 'SYNC_STATE', payload: state });
+  // Função para salvar o estado no banco de dados
+  const syncStateToDb = async (newState: GameState) => {
+    isUpdatingRef.current = true;
+    try {
+      const { error } = await supabase
+        .from('rooms')
+        .update({ state: newState, updated_at: new Date().toISOString() })
+        .eq('code', newState.roomCode);
+      
+      if (error) throw error;
+    } catch (err) {
+      console.error('Erro ao sincronizar com DB:', err);
+    } finally {
+      // Pequeno delay para garantir que o evento de broadcast do próprio DB seja ignorado
+      setTimeout(() => { isUpdatingRef.current = false; }, 500);
+    }
   };
 
   useEffect(() => {
@@ -57,23 +73,34 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Tenta recuperar sessão anterior
   useEffect(() => {
     const saved = localStorage.getItem('taco_session');
     if (saved) {
       const { state, userId } = JSON.parse(saved);
-      setGameState(state);
-      setCurrentUserId(userId);
+      // Validar se a sala ainda existe no banco
+      supabase.from('rooms').select('state').eq('code', state.roomCode).single().then(({ data }) => {
+        if (data) {
+          setGameState(data.state as GameState);
+          setCurrentUserId(userId);
+        } else {
+          localStorage.removeItem('taco_session');
+        }
+      });
     }
   }, []);
 
+  // Persistir no localStorage para reconexão rápida
   useEffect(() => {
     if (gameState && currentUserId) {
       localStorage.setItem('taco_session', JSON.stringify({ state: gameState, userId: currentUserId }));
     }
   }, [gameState, currentUserId]);
 
-  const handleCreateRoom = useCallback((adminName: string) => {
+  const handleCreateRoom = useCallback(async (adminName: string) => {
     const adminId = Math.random().toString(36).substr(2, 9);
+    const code = generateRoomCode();
+    
     const newAdmin: Player = {
       id: adminId,
       name: adminName,
@@ -83,7 +110,7 @@ const App: React.FC = () => {
     };
 
     const newState: GameState = {
-      roomCode: generateRoomCode(),
+      roomCode: code,
       phase: GamePhase.LOBBY,
       players: [newAdmin],
       currentTurnIndex: 0,
@@ -92,15 +119,39 @@ const App: React.FC = () => {
       winnerId: null
     };
 
+    // Salva a nova sala no banco
+    const { error } = await supabase.from('rooms').insert([{ code, state: newState }]);
+    
+    if (error) {
+      alert('Erro ao criar sala. Tente novamente.');
+      return;
+    }
+
     setCurrentUserId(adminId);
     setGameState(newState);
     HapticService.vibrateJoin();
     AudioService.playSuccess();
-    broadcastState(newState);
   }, []);
 
-  const handleJoinRoom = useCallback((code: string, playerName: string) => {
+  const handleJoinRoom = useCallback(async (code: string, playerName: string) => {
+    const cleanCode = code.toUpperCase().trim();
+    
+    // 1. Buscar estado atual da sala no banco
+    const { data, error } = await supabase
+      .from('rooms')
+      .select('state')
+      .eq('code', cleanCode)
+      .single();
+
+    if (error || !data) {
+      alert('Sala não encontrada. Verifique o código.');
+      return;
+    }
+
+    const currentState = data.state as GameState;
     const playerId = Math.random().toString(36).substr(2, 9);
+    
+    // 2. Criar novo jogador
     const newPlayer: Player = {
       id: playerId,
       name: playerName,
@@ -109,27 +160,27 @@ const App: React.FC = () => {
       cardsPlayedThisRound: 0
     };
 
-    setCurrentUserId(playerId);
-    
-    // Cria um estado inicial local para o player que está entrando entrar no Lobby
-    const initialJoinState: GameState = {
-      roomCode: code,
-      phase: GamePhase.LOBBY,
-      players: [newPlayer],
-      currentTurnIndex: 0,
-      tablePile: [],
-      lastLoserId: null,
-      winnerId: null
+    // 3. Atualizar estado com o novo jogador
+    const newState = {
+      ...currentState,
+      players: [...currentState.players, newPlayer]
     };
-    
-    setGameState(initialJoinState);
+
+    // 4. Salvar de volta no banco
+    const { error: updateError } = await supabase
+      .from('rooms')
+      .update({ state: newState })
+      .eq('code', cleanCode);
+
+    if (updateError) {
+      alert('Erro ao entrar na sala.');
+      return;
+    }
+
+    setCurrentUserId(playerId);
+    setGameState(newState);
     HapticService.vibrateJoin();
     AudioService.playSuccess();
-
-    // Notifica o canal. O Host responderá com o estado completo se estiver online.
-    setTimeout(() => {
-      syncChannel.current?.postMessage({ type: 'PLAYER_JOINED', payload: newPlayer });
-    }, 100);
   }, []);
 
   const handleStartGame = useCallback(() => {
@@ -147,16 +198,13 @@ const App: React.FC = () => {
 
     setGameState(newState);
     AudioService.playDeal();
-    broadcastState(newState);
+    syncStateToDb(newState);
   }, [gameState]);
 
   const handlePlayCard = useCallback(() => {
     if (!gameState || !currentUserId) return;
     const player = gameState.players[gameState.currentTurnIndex];
     if (player.id !== currentUserId) return;
-
-    AudioService.playCard();
-    HapticService.vibrateCard();
 
     const playerIdx = gameState.currentTurnIndex;
     const currentPlayer = gameState.players[playerIdx];
@@ -167,9 +215,12 @@ const App: React.FC = () => {
         currentTurnIndex: (gameState.currentTurnIndex + 1) % gameState.players.length
       };
       setGameState(nextState);
-      broadcastState(nextState);
+      syncStateToDb(nextState);
       return;
     }
+
+    AudioService.playCard();
+    HapticService.vibrateCard();
 
     const newHand = [...currentPlayer.hand];
     const playedCard = newHand.pop()!;
@@ -181,7 +232,7 @@ const App: React.FC = () => {
       return p;
     });
 
-    const nextState = {
+    const nextState: GameState = {
       ...gameState,
       players: updatedPlayers,
       tablePile: [...gameState.tablePile, playedCard],
@@ -189,7 +240,7 @@ const App: React.FC = () => {
     };
     
     setGameState(nextState);
-    broadcastState(nextState);
+    syncStateToDb(nextState);
   }, [gameState, currentUserId]);
 
   const handleResolveRound = useCallback((loserId: string) => {
@@ -207,7 +258,7 @@ const App: React.FC = () => {
     const totalCards = 52;
     const gameLoser = updatedPlayers.find(p => p.hand.length >= totalCards);
 
-    let nextState;
+    let nextState: GameState;
     if (gameLoser) {
         nextState = {
             ...gameState,
@@ -228,7 +279,7 @@ const App: React.FC = () => {
     }
     
     setGameState(nextState);
-    broadcastState(nextState);
+    syncStateToDb(nextState);
   }, [gameState]);
 
   const resetSession = () => {
@@ -238,29 +289,34 @@ const App: React.FC = () => {
       window.history.replaceState({}, document.title, window.location.pathname);
   };
 
-  if (!gameState) {
-    return <JoinScreen initialCode={urlRoomCode} onCreate={handleCreateRoom} onJoin={handleJoinRoom} />;
-  }
-
-  if (gameState.phase === GamePhase.LOBBY) {
-    return (
-      <Lobby
-        gameState={gameState}
-        currentUserId={currentUserId!}
-        onStart={handleStartGame}
-        onQuit={resetSession}
-      />
-    );
-  }
-
   return (
-    <GameBoard
-      gameState={gameState}
-      currentUserId={currentUserId!}
-      onPlay={handlePlayCard}
-      onResolve={handleResolveRound}
-      onQuit={resetSession}
-    />
+    <div className="relative">
+      {!gameState ? (
+        <JoinScreen initialCode={urlRoomCode} onCreate={handleCreateRoom} onJoin={handleJoinRoom} />
+      ) : gameState.phase === GamePhase.LOBBY ? (
+        <Lobby
+          gameState={gameState}
+          currentUserId={currentUserId!}
+          onStart={handleStartGame}
+          onQuit={resetSession}
+        />
+      ) : (
+        <GameBoard
+          gameState={gameState}
+          currentUserId={currentUserId!}
+          onPlay={handlePlayCard}
+          onResolve={handleResolveRound}
+          onQuit={resetSession}
+        />
+      )}
+      
+      {/* Indicador de Status de Conexão Realtime */}
+      {gameState && (
+        <div className={`fixed bottom-2 right-2 text-[8px] font-black uppercase px-2 py-1 rounded-full border shadow-sm z-50 transition-colors ${isConnected ? 'bg-green-100 border-green-200 text-green-600' : 'bg-red-100 border-red-200 text-red-600'}`}>
+          {isConnected ? '● Conectado' : '○ Reconectando...'}
+        </div>
+      )}
+    </div>
   );
 };
 

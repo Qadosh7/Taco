@@ -93,16 +93,6 @@ const Lobby: React.FC<LobbyProps> = ({ gameState, currentUserId, onStart, onQuit
         <p className="text-sm text-[#1A1A1A] opacity-70 mt-2 font-medium">Convide a galera para bater Taco</p>
       </div>
 
-      {/* Alerta de Sincronização Local */}
-      <div className="bg-[#0D3B66]/5 border border-[#0D3B66]/10 p-4 rounded-2xl mb-8 text-center">
-        <p className="text-[10px] font-bold text-[#0D3B66]/60 uppercase tracking-widest">
-          <i className="fa-solid fa-circle-info mr-1"></i> Modo de Demonstração
-        </p>
-        <p className="text-[9px] text-[#0D3B66]/40 leading-tight mt-1">
-          Atualmente, a sincronização funciona entre abas do mesmo navegador. Para jogar em celulares diferentes, integre com um banco de dados real.
-        </p>
-      </div>
-
       <div className="relative mb-12">
         <button
           onClick={handleShare}
