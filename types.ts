@@ -25,12 +25,35 @@ export interface Card {
   image_front_url: string;
 }
 
+export interface PlayerAvatar {
+  color: string;
+  emoji: string;
+  id: string;
+}
+
+export interface Reaction {
+  id: string;
+  playerId: string;
+  emoji: string;
+  timestamp: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  playerName: string;
+  text: string;
+  timestamp: number;
+  color: string;
+}
+
 export interface Player {
   id: string;
   name: string;
   hand: Card[];
   isHost: boolean;
   cardsPlayedThisRound: number;
+  avatar: PlayerAvatar;
 }
 
 export interface GameState {
@@ -41,4 +64,6 @@ export interface GameState {
   tablePile: Card[];
   lastLoserId: string | null;
   winnerId: string | null;
+  reactions: Reaction[];
+  chat: ChatMessage[];
 }

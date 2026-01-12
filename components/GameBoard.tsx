@@ -5,6 +5,8 @@ import { COLORS } from '../constants';
 import CardUI from './CardUI';
 import { HapticService } from '../services/hapticService';
 import { AudioService } from '../services/audioService';
+import ReactionSystem from './ReactionSystem';
+import AvatarCharacter from './AvatarCharacter';
 
 interface GameBoardProps {
   gameState: GameState;
@@ -12,9 +14,11 @@ interface GameBoardProps {
   onPlay: () => void;
   onResolve: (loserId: string) => void;
   onQuit: () => void;
+  onSendReaction: (emoji: string) => void;
+  onSendMessage: (text: string) => void;
 }
 
-const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay, onResolve, onQuit }) => {
+const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay, onResolve, onQuit, onSendReaction, onSendMessage }) => {
   const [showLoserModal, setShowLoserModal] = useState(false);
   const currentPlayer = gameState.players[gameState.currentTurnIndex];
   const me = gameState.players.find(p => p.id === currentUserId);
@@ -68,7 +72,16 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
         }
       `}</style>
 
-      {/* Header Compacto - Ocupa menos altura */}
+      {/* Sistema de Interação Flutuante */}
+      <ReactionSystem 
+        players={gameState.players} 
+        reactions={gameState.reactions} 
+        messages={gameState.chat}
+        onSendReaction={onSendReaction}
+        onSendMessage={onSendMessage}
+      />
+
+      {/* Header Compacto */}
       <header className="px-4 py-2 flex justify-between items-center z-10 shrink-0">
         <button 
           onClick={onQuit} 
@@ -88,14 +101,13 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
         </div>
       </header>
 
-      {/* Arena de Jogo - Flex-1 expande para ocupar o máximo de espaço */}
+      {/* Arena de Jogo */}
       <main className="flex-1 relative flex flex-col items-center justify-center min-h-0">
-        {/* Play Mat */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
              <div className="w-[85vw] h-[85vw] max-w-[450px] max-h-[450px] play-mat opacity-50 rounded-full"></div>
         </div>
 
-        {/* Turn Indicator Slimmer */}
+        {/* Turn Indicator */}
         <div className="absolute top-2 flex justify-center w-full z-10">
             <div className={`px-5 py-2 rounded-full border-2 transition-all duration-500 transform ${
                 isMyTurn 
@@ -110,7 +122,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
             </div>
         </div>
 
-        {/* Pilha Central com Cartas Maiores */}
+        {/* Pilha Central */}
         <div className="relative w-72 h-80 flex items-center justify-center scale-100 sm:scale-110">
             {gameState.tablePile.length > 0 ? (
                 gameState.tablePile.slice(-5).map((card, idx, arr) => {
@@ -137,27 +149,29 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
             )}
         </div>
 
-        {/* Avatares Laterais/Inferiores Compactos */}
-        <div className="w-full absolute bottom-2 flex justify-center gap-3 no-scrollbar px-4 pb-2">
+        {/* Avatares dos Jogadores (Visual Fall Guys) */}
+        <div className="w-full absolute bottom-0 flex justify-center gap-6 overflow-x-auto no-scrollbar px-10 pb-4 h-36 items-end">
             {gameState.players.map(p => (
-                <div key={p.id} className={`flex flex-col items-center transition-all duration-500 ${p.id === currentPlayer?.id ? 'scale-110' : 'opacity-40 scale-90'}`}>
-                    <div className={`w-11 h-11 rounded-xl border-2 flex items-center justify-center font-black text-lg shadow-lg relative ${p.id === currentUserId ? 'bg-[#F4D35E] border-[#0D3B66] text-[#0D3B66]' : 'bg-white border-gray-200 text-[#0D3B66]'}`}>
-                        {p.name.charAt(0).toUpperCase()}
-                        {p.hand.length > 0 && (
-                          <div className="absolute -top-1.5 -right-1.5 bg-[#F95738] text-white text-[9px] w-5 h-5 rounded-lg border-2 border-white flex items-center justify-center font-black">
-                              {p.hand.length}
-                          </div>
-                        )}
-                    </div>
+                <div key={p.id} className={`flex flex-col items-center transition-all duration-500 shrink-0 ${p.id === currentPlayer?.id ? 'scale-110 -translate-y-4' : 'opacity-40 scale-90'}`}>
+                    <AvatarCharacter avatar={p.avatar} size="md" isFloating={p.id === currentPlayer?.id} />
+                    
+                    {p.hand.length > 0 && (
+                      <div className="absolute -top-1.5 -right-2 bg-[#F95738] text-white text-[10px] w-6 h-6 rounded-lg border-2 border-white flex items-center justify-center font-black z-20 shadow-md">
+                          {p.hand.length}
+                      </div>
+                    )}
+                    
+                    <span className={`text-[8px] font-black uppercase mt-2 px-2 py-0.5 rounded-full ${p.id === currentPlayer?.id ? 'bg-[#0D3B66] text-white' : 'text-[#0D3B66]/50'}`}>
+                        {p.name.split(' ')[0]}
+                    </span>
                 </div>
             ))}
         </div>
       </main>
 
-      {/* Footer Fixo Otimizado */}
+      {/* Footer */}
       <footer className={`relative shrink-0 pt-4 pb-8 px-6 flex flex-col items-center z-10 transition-all duration-500 ${isMyTurn ? 'bg-[#F4D35E]/10' : ''}`}>
         
-        {/* Card do Jogador - Reduzido na base para não empurrar a tela */}
         <div className={`relative mb-4 transition-all duration-500 ${isMyTurn ? 'scale-100 -translate-y-4' : 'scale-75 opacity-20 translate-y-6 grayscale'}`}>
             <CardUI
                 faceDown={true}
@@ -167,7 +181,6 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
             />
         </div>
 
-        {/* Botão de Jogo */}
         <div className="w-full max-w-xs flex flex-col gap-2">
           {isMyTurn ? (
             <button
@@ -196,21 +209,19 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
         </div>
       </footer>
 
-      {/* Modal de Perdedor (Simples) */}
+      {/* Modal de Perdedor */}
       {showLoserModal && (
         <div className="fixed inset-0 bg-[#0D3B66]/90 backdrop-blur-md z-[100] flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 shadow-2xl border-4 border-[#0D3B66] animate-in zoom-in duration-300">
+          <div className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl border-4 border-[#0D3B66] animate-in zoom-in duration-300">
             <h3 className="text-2xl font-black text-[#0D3B66] text-center mb-8 uppercase italic tracking-tighter">Quem sobrou por último? 🐢</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-6 max-h-[50vh] overflow-y-auto no-scrollbar p-1">
               {gameState.players.map(p => (
                 <button
                   key={p.id}
                   onClick={() => handleResolveAction(p.id)}
-                  className="p-5 bg-gray-50 border-2 border-gray-100 rounded-3xl font-black text-[#0D3B66] flex flex-col items-center gap-3 transition-all hover:bg-[#F4D35E] hover:border-[#0D3B66] active:scale-95 shadow-sm"
+                  className="p-5 bg-gray-50 border-2 border-gray-100 rounded-[2.5rem] font-black text-[#0D3B66] flex flex-col items-center gap-4 transition-all hover:bg-[#F4D35E] hover:border-[#0D3B66] active:scale-95 shadow-sm"
                 >
-                  <div className="w-12 h-12 rounded-2xl bg-[#0D3B66] text-white flex items-center justify-center text-xl">
-                      {p.name.charAt(0).toUpperCase()}
-                  </div>
+                  <AvatarCharacter avatar={p.avatar} size="md" />
                   <span className="text-xs uppercase tracking-tight truncate w-full text-center">{p.name}</span>
                 </button>
               ))}
@@ -230,7 +241,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ gameState, currentUserId, onPlay,
           <div className="fixed inset-0 bg-[#F4D35E] z-[110] flex flex-col items-center justify-center p-8 text-center animate-in slide-in-from-top-full duration-1000">
               <div className="text-9xl mb-6 animate-bounce">👑</div>
               <h1 className="text-6xl font-black text-[#0D3B66] mb-2 uppercase italic leading-none tracking-tighter">TEMOS UM<br/>VENCEDOR!</h1>
-              <div className="bg-white p-10 rounded-[3.5rem] border-4 border-[#0D3B66] shadow-2xl mb-12 w-full max-w-sm">
+              <div className="bg-white p-10 rounded-[3.5rem] border-4 border-[#0D3B66] shadow-2xl mb-12 w-full max-w-sm flex flex-col items-center">
+                  <AvatarCharacter avatar={gameState.players.find(p => p.id === gameState.winnerId)!.avatar} size="lg" isFloating={true} className="mb-4" />
                   <p className="text-[#F95738] text-4xl font-black uppercase tracking-tighter">
                       {gameState.players.find(p => p.id === gameState.winnerId)?.name} 🔥
                   </p>

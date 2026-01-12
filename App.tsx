@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { GameState, GamePhase, Player, Card } from './types';
+import { GameState, GamePhase, Player, Card, PlayerAvatar, Reaction, ChatMessage } from './types';
 import { createDeck, distributeCards, generateRoomCode } from './services/gameLogic';
 import Lobby from './components/Lobby';
 import GameBoard from './components/GameBoard';
@@ -17,7 +17,6 @@ const App: React.FC = () => {
   
   const isUpdatingRef = useRef(false);
 
-  // Sincronização em tempo real via Database Changes
   useEffect(() => {
     if (!gameState?.roomCode) return;
 
@@ -49,9 +48,20 @@ const App: React.FC = () => {
   const syncStateToDb = async (newState: GameState) => {
     isUpdatingRef.current = true;
     try {
+      // Limpa reações antigas (mais de 10 segundos) e limita chat a 30 mensagens
+      const now = Date.now();
+      const cleanedReactions = newState.reactions.filter(r => now - r.timestamp < 10000);
+      const cleanedChat = newState.chat.slice(-30);
+
+      const stateToSave = { 
+        ...newState, 
+        reactions: cleanedReactions,
+        chat: cleanedChat 
+      };
+
       const { error } = await supabase
         .from('rooms')
-        .update({ state: newState, updated_at: new Date().toISOString() })
+        .update({ state: stateToSave, updated_at: new Date().toISOString() })
         .eq('code', newState.roomCode);
       
       if (error) throw error;
@@ -89,7 +99,7 @@ const App: React.FC = () => {
     }
   }, [gameState, currentUserId]);
 
-  const handleCreateRoom = useCallback(async (adminName: string) => {
+  const handleCreateRoom = useCallback(async (adminName: string, avatar: PlayerAvatar) => {
     const adminId = Math.random().toString(36).substr(2, 9);
     const code = generateRoomCode();
     
@@ -98,7 +108,8 @@ const App: React.FC = () => {
       name: adminName,
       hand: [],
       isHost: true,
-      cardsPlayedThisRound: 0
+      cardsPlayedThisRound: 0,
+      avatar
     };
 
     const newState: GameState = {
@@ -108,7 +119,9 @@ const App: React.FC = () => {
       currentTurnIndex: 0,
       tablePile: [],
       lastLoserId: null,
-      winnerId: null
+      winnerId: null,
+      reactions: [],
+      chat: []
     };
 
     const { error } = await supabase.from('rooms').insert([{ code, state: newState }]);
@@ -120,14 +133,14 @@ const App: React.FC = () => {
     AudioService.playSuccess();
   }, []);
 
-  const handleJoinRoom = useCallback(async (code: string, playerName: string) => {
+  const handleJoinRoom = useCallback(async (code: string, playerName: string, avatar: PlayerAvatar) => {
     const cleanCode = code.toUpperCase().trim();
     const { data, error } = await supabase.from('rooms').select('state').eq('code', cleanCode).single();
     if (error || !data) return alert('Sala não encontrada.');
 
     const currentState = data.state as GameState;
     const playerId = Math.random().toString(36).substr(2, 9);
-    const newPlayer: Player = { id: playerId, name: playerName, hand: [], isHost: false, cardsPlayedThisRound: 0 };
+    const newPlayer: Player = { id: playerId, name: playerName, hand: [], isHost: false, cardsPlayedThisRound: 0, avatar };
     const newState = { ...currentState, players: [...currentState.players, newPlayer] };
 
     const { error: updateError } = await supabase.from('rooms').update({ state: newState }).eq('code', cleanCode);
@@ -179,8 +192,6 @@ const App: React.FC = () => {
     HapticService.vibrateLoss();
     const updatedPlayers = gameState.players.map(p => p.id === loserId ? { ...p, hand: [...p.hand, ...gameState.tablePile] } : p);
     
-    // Regra oficial: o jogo acaba quando alguém atinge o limite do baralho ou uma condição de vitória é definida pelo grupo
-    // No app, mantemos a derrota se atingir a capacidade total do baralho original (64 cartas)
     const totalCards = 64; 
     const gameLoser = updatedPlayers.find(p => p.hand.length >= totalCards);
 
@@ -194,6 +205,39 @@ const App: React.FC = () => {
     syncStateToDb(nextState);
   }, [gameState]);
 
+  const handleSendReaction = useCallback((emoji: string) => {
+    if (!gameState || !currentUserId) return;
+    const newReaction: Reaction = {
+      id: Math.random().toString(36).substr(2, 9),
+      playerId: currentUserId,
+      emoji,
+      timestamp: Date.now()
+    };
+    const newState = { ...gameState, reactions: [...gameState.reactions, newReaction] };
+    setGameState(newState);
+    syncStateToDb(newState);
+  }, [gameState, currentUserId]);
+
+  const handleSendMessage = useCallback((text: string) => {
+    if (!gameState || !currentUserId) return;
+    const player = gameState.players.find(p => p.id === currentUserId);
+    if (!player) return;
+
+    const newMessage: ChatMessage = {
+      id: Math.random().toString(36).substr(2, 9),
+      playerId: currentUserId,
+      playerName: player.name,
+      text,
+      timestamp: Date.now(),
+      color: player.avatar.color
+    };
+
+    const newState = { ...gameState, chat: [...gameState.chat, newMessage] };
+    setGameState(newState);
+    syncStateToDb(newState);
+    HapticService.vibrateAction();
+  }, [gameState, currentUserId]);
+
   const resetSession = () => {
       localStorage.removeItem('taco_session');
       setGameState(null);
@@ -206,9 +250,24 @@ const App: React.FC = () => {
       {!gameState ? (
         <JoinScreen initialCode={urlRoomCode} onCreate={handleCreateRoom} onJoin={handleJoinRoom} />
       ) : gameState.phase === GamePhase.LOBBY ? (
-        <Lobby gameState={gameState} currentUserId={currentUserId!} onStart={handleStartGame} onQuit={resetSession} />
+        <Lobby 
+          gameState={gameState} 
+          currentUserId={currentUserId!} 
+          onStart={handleStartGame} 
+          onQuit={resetSession} 
+          onSendReaction={handleSendReaction}
+          onSendMessage={handleSendMessage}
+        />
       ) : (
-        <GameBoard gameState={gameState} currentUserId={currentUserId!} onPlay={handlePlayCard} onResolve={handleResolveRound} onQuit={resetSession} />
+        <GameBoard 
+          gameState={gameState} 
+          currentUserId={currentUserId!} 
+          onPlay={handlePlayCard} 
+          onResolve={handleResolveRound} 
+          onQuit={resetSession} 
+          onSendReaction={handleSendReaction}
+          onSendMessage={handleSendMessage}
+        />
       )}
       {gameState && (
         <div className={`fixed bottom-2 right-2 text-[8px] font-black uppercase px-2 py-1 rounded-full border shadow-sm z-50 transition-colors ${isConnected ? 'bg-green-100 border-green-200 text-green-600' : 'bg-red-100 border-red-200 text-red-600'}`}>
