@@ -29,21 +29,21 @@ const getIcon = (type: CardType) => {
 };
 
 const CardUI: React.FC<CardUIProps> = ({ card, faceDown, highlightIndex = 0, onClick, className = '', style }) => {
-  // Tamanho aumentado: w-36 h-52 (aprox 144px x 208px)
-  const baseClasses = "w-36 h-52 rounded-[2.8rem] border-[7px] shadow-2xl flex flex-col items-center select-none overflow-hidden transition-all duration-300";
+  // Tamanho aumentado: w-44 h-64 (aprox 176px x 256px) para maior destaque
+  const baseClasses = "w-44 h-64 rounded-[3rem] border-[8px] shadow-2xl flex flex-col items-center select-none overflow-hidden transition-all duration-300";
 
   if (faceDown) {
     return (
       <div
         onClick={onClick}
-        className={`${baseClasses} bg-white border-[#F0F2F5] justify-center p-5 cursor-pointer active:scale-95 ${className}`}
+        className={`${baseClasses} bg-white border-[#F0F2F5] justify-center p-6 cursor-pointer active:scale-95 ${className}`}
         style={style}
       >
-        <div className="flex flex-col items-center gap-2 w-full">
+        <div className="flex flex-col items-center gap-2.5 w-full">
           {SEQUENCE.map((word, idx) => (
             <div 
               key={word}
-              className={`text-[12px] font-black uppercase tracking-[0.15em] transition-all duration-300 ${
+              className={`text-[14px] font-black uppercase tracking-[0.2em] transition-all duration-300 ${
                 idx === highlightIndex 
                 ? 'text-[#0D3B66] scale-125 translate-x-1' 
                 : 'text-gray-100 scale-90'
@@ -54,9 +54,9 @@ const CardUI: React.FC<CardUIProps> = ({ card, faceDown, highlightIndex = 0, onC
           ))}
         </div>
         
-        <div className="mt-6 flex gap-1.5">
+        <div className="mt-8 flex gap-2">
           {[0, 1, 2].map(i => (
-            <div key={i} className={`w-2 h-2 rounded-full ${i === highlightIndex % 3 ? 'bg-[#F4D35E]' : 'bg-gray-100'}`}></div>
+            <div key={i} className={`w-2.5 h-2.5 rounded-full ${i === highlightIndex % 3 ? 'bg-[#F4D35E]' : 'bg-gray-100'}`}></div>
           ))}
         </div>
       </div>
@@ -69,33 +69,33 @@ const CardUI: React.FC<CardUIProps> = ({ card, faceDown, highlightIndex = 0, onC
     <div
       onClick={onClick}
       style={style}
-      className={`${baseClasses} bg-white border-white p-5 relative ${className} ${card.isSpecial ? 'ring-[10px] ring-[#F4D35E]/40' : ''}`}
+      className={`${baseClasses} bg-white border-white p-6 relative ${className} ${card.isSpecial ? 'ring-[12px] ring-[#F4D35E]/40' : ''}`}
     >
       <div className="w-full flex justify-center items-center z-10 mb-2">
-        <span className="text-[11px] font-black text-[#0D3B66] uppercase tracking-tighter bg-[#0D3B66]/5 px-4 py-1.5 rounded-full border border-[#0D3B66]/10">
+        <span className="text-[13px] font-black text-[#0D3B66] uppercase tracking-tighter bg-[#0D3B66]/5 px-5 py-2 rounded-full border border-[#0D3B66]/10">
           {card.name}
         </span>
       </div>
       
       <div className="flex-1 flex items-center justify-center z-10">
-        <div className="text-7xl drop-shadow-md transform scale-125 transition-transform hover:rotate-6">
+        <div className="text-8xl drop-shadow-lg transform scale-110 transition-transform hover:rotate-6">
           {getIcon(card.type)}
         </div>
       </div>
       
-      <div className="w-full text-center flex justify-center gap-2 z-10 mt-2">
+      <div className="w-full text-center flex justify-center gap-2.5 z-10 mt-3">
          {[...Array(3)].map((_, i) => (
-           <div key={i} className={`h-2 w-2 rounded-full ${card.isSpecial ? 'bg-[#F4D35E]' : 'bg-[#0D3B66]/10'}`}></div>
+           <div key={i} className={`h-2.5 w-2.5 rounded-full ${card.isSpecial ? 'bg-[#F4D35E]' : 'bg-[#0D3B66]/10'}`}></div>
          ))}
       </div>
 
       {/* Marca d'água de fundo */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-[0.04] pointer-events-none">
-         <span className="text-[12rem] transform -rotate-12">{getIcon(card.type)}</span>
+      <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none">
+         <span className="text-[14rem] transform -rotate-12">{getIcon(card.type)}</span>
       </div>
       
       {/* Brilho no topo */}
-      <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/60 to-transparent pointer-events-none"></div>
+      <div className="absolute top-0 left-0 right-0 h-1/3 bg-gradient-to-b from-white/70 to-transparent pointer-events-none"></div>
     </div>
   );
 };

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { COLORS } from '../constants';
 import RulesModal from './RulesModal';
+import BackupModal from './BackupModal'; // Novo Import
 import { PlayerAvatar } from '../types';
 import AvatarCharacter from './AvatarCharacter';
 
@@ -24,7 +25,6 @@ const AVATARS: PlayerAvatar[] = [
   { id: '10', color: '#8B4513', emoji: '🌮' }, // O próprio Taco
 ];
 
-// Componente extraído para fora para manter a estabilidade do DOM e o foco do input
 interface FormContentProps {
   actionLabel: string;
   onAction: () => void;
@@ -39,7 +39,6 @@ const FormContent: React.FC<FormContentProps> = ({ actionLabel, onAction, name, 
     <div className="mb-6">
       <label className="text-[10px] font-black text-[#0D3B66]/40 uppercase tracking-widest block mb-4 text-center">Quem é você no jogo?</label>
       
-      {/* Preview Grande - h-28 agora é suficiente para o avatar reduzido */}
       <div className="flex justify-center mb-6 h-28 items-end">
         <AvatarCharacter avatar={selectedAvatar} size="xl" isFloating={true} />
       </div>
@@ -81,6 +80,7 @@ const JoinScreen: React.FC<JoinScreenProps> = ({ initialCode, onCreate, onJoin }
   const [selectedAvatar, setSelectedAvatar] = useState<PlayerAvatar>(AVATARS[0]);
   const [view, setView] = useState<'HOME' | 'CREATE' | 'JOIN'>(initialCode ? 'JOIN' : 'HOME');
   const [showRules, setShowRules] = useState(false);
+  const [showBackup, setShowBackup] = useState(false); // Novo Estado
 
   useEffect(() => {
     if (initialCode) {
@@ -165,12 +165,22 @@ const JoinScreen: React.FC<JoinScreenProps> = ({ initialCode, onCreate, onJoin }
           ENTRAR <i className="fa-solid fa-gamepad text-white/50"></i>
         </button>
         
-        <button
-          onClick={() => setShowRules(true)}
-          className="mt-4 p-5 border-4 border-dashed border-[#0D3B66]/20 text-[#0D3B66] rounded-[2rem] font-black text-xs tracking-widest uppercase flex items-center justify-center gap-3 active:bg-white/40 transition-colors"
-        >
-          <i className="fa-solid fa-book-open"></i> Regras de Ouro
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowRules(true)}
+            className="flex-1 p-5 border-4 border-dashed border-[#0D3B66]/20 text-[#0D3B66] rounded-[2rem] font-black text-[10px] tracking-widest uppercase flex items-center justify-center gap-2 active:bg-white/40 transition-colors"
+          >
+            <i className="fa-solid fa-book-open"></i> Regras
+          </button>
+          
+          <button
+            onClick={() => setShowBackup(true)}
+            className="p-5 border-4 border-[#0D3B66]/10 text-[#0D3B66]/30 rounded-[2rem] font-black text-[10px] flex items-center justify-center active:bg-white/40 transition-colors"
+            title="Backup do Projeto"
+          >
+            <i className="fa-solid fa-floppy-disk"></i>
+          </button>
+        </div>
       </div>
 
       <div className="mt-16 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full border border-[#0D3B66]/5 shadow-sm">
@@ -178,6 +188,7 @@ const JoinScreen: React.FC<JoinScreenProps> = ({ initialCode, onCreate, onJoin }
       </div>
       
       <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />
+      <BackupModal isOpen={showBackup} onClose={() => setShowBackup(false)} />
     </div>
   );
 };

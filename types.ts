@@ -54,6 +54,12 @@ export interface Player {
   isHost: boolean;
   cardsPlayedThisRound: number;
   avatar: PlayerAvatar;
+  isOnline?: boolean; // Novo: Status em tempo real
+}
+
+export interface SlapRecord {
+  playerId: string;
+  timestamp: number;
 }
 
 export interface GameState {
@@ -66,4 +72,7 @@ export interface GameState {
   winnerId: string | null;
   reactions: Reaction[];
   chat: ChatMessage[];
+  version: number;
+  isSlapActive: boolean;
+  slapRecords: SlapRecord[];
 }
